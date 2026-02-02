@@ -23,14 +23,8 @@
     <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
 
     <style>
-        /* Custom scrollbar hiding for cleaner UI */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -41,7 +35,6 @@
         window.onerror = function(message, source, lineno, colno, error) {
             if (document.getElementById('root').innerHTML === "") {
                 console.error(message);
-                // alert("App Error: " + message); // Optional: Uncomment for debugging
             }
         };
     </script>
@@ -132,7 +125,7 @@
 
         // --- COMPONENTS ---
 
-        const LandingPage = ({ onGoogleLogin, onGuestLogin, error }) => (
+        const LoginPage = ({ onLogin, error }) => (
             <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center font-sans">
                 <div className="max-w-md w-full">
                     <div className="flex justify-center mb-8">
@@ -150,7 +143,7 @@
 
                     <div className="space-y-4">
                         <button 
-                            onClick={onGoogleLogin}
+                            onClick={onLogin}
                             className="w-full bg-white text-slate-900 font-bold text-lg py-4 rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-3 shadow-lg"
                         >
                             <svg className="w-6 h-6" viewBox="0 0 24 24">
@@ -160,13 +153,6 @@
                                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                             </svg>
                             Sign in with Google
-                        </button>
-
-                        <button 
-                            onClick={onGuestLogin}
-                            className="w-full bg-slate-800 text-slate-400 font-semibold py-4 rounded-xl hover:bg-slate-700 hover:text-white transition-all border border-slate-700"
-                        >
-                            Continue as Guest
                         </button>
                     </div>
 
@@ -183,7 +169,7 @@
             </div>
         );
 
-        const Navigation = ({ activeTab, setActiveTab, user, onLogin, onLogout }) => {
+        const Navigation = ({ activeTab, setActiveTab, user, onLogout }) => {
             const navItems = [
                 { id: 'home', label: 'Dashboard', icon: BookOpen },
                 { id: 'synonyms', label: 'Synonyms', icon: LinkIcon },
@@ -221,18 +207,11 @@
 
                     {/* User Profile */}
                     <div>
-                        {user?.isAnonymous ? (
-                            <button onClick={onLogin} className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-colors">
-                                <User className="w-4 h-4" />
-                                <span>Save</span>
-                            </button>
-                        ) : (
-                            <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-slate-200 transition-colors" title="Log out">
-                                <img src={user?.photoURL} className="w-4 h-4 rounded-full" onError={(e) => e.target.style.display='none'} />
-                                <span>{user?.displayName?.split(' ')[0] || 'User'}</span>
-                                <LogOut className="w-3 h-3 ml-1" />
-                            </button>
-                        )}
+                        <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-slate-200 transition-colors" title="Log out">
+                            <img src={user?.photoURL} className="w-4 h-4 rounded-full" onError={(e) => e.target.style.display='none'} />
+                            <span>{user?.displayName?.split(' ')[0] || 'User'}</span>
+                            <LogOut className="w-3 h-3 ml-1" />
+                        </button>
                     </div>
                     </div>
                 </div>
@@ -240,7 +219,7 @@
             );
         };
 
-        const Dashboard = ({ items, onReview, dueCount, onLoadDemo, isAdding, user, onLogin }) => {
+        const Dashboard = ({ items, onReview, dueCount, onLoadDemo, isAdding }) => {
             const stats = useMemo(() => {
                 const total = items.length;
                 const mastered = items.filter(i => i.interval > 21).length;
@@ -260,7 +239,7 @@
                         You have <span className="font-bold text-white bg-white/20 px-2 py-0.5 rounded-lg">{dueCount} cards</span> waiting for review.
                     </p>
                     
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex gap-3">
                         <button
                         onClick={onReview}
                         disabled={dueCount === 0}
@@ -287,28 +266,6 @@
                     </div>
                     </div>
                 </div>
-
-                {/* Account Safety Warning */}
-                {user?.isAnonymous && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-4">
-                        <div className="bg-amber-100 p-2 rounded-full text-amber-600">
-                            <AlertTriangle className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-amber-900">Your progress is not permanent!</h3>
-                            <p className="text-sm text-amber-800 mb-3">
-                                You are using a Guest account. If you clear cookies or change browsers, you will lose your {items.length} words.
-                            </p>
-                            <button 
-                                onClick={onLogin}
-                                className="bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2"
-                            >
-                                <ShieldCheck className="w-4 h-4" />
-                                Link Google Account
-                            </button>
-                        </div>
-                    </div>
-                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4">
@@ -649,7 +606,6 @@
         const ReviewSession = ({ dueItems, onComplete, onClose }) => {
             const [isFlipped, setIsFlipped] = useState(false);
             const totalDue = dueItems.length;
-            
             const currentItem = dueItems[0]; 
 
             if (!currentItem) {
@@ -772,123 +728,55 @@
 
         const App = () => {
             const [user, setUser] = useState(null);
-            const [activeTab, setActiveTab] = useState('home');
             const [items, setItems] = useState([]);
-            const [isReviewing, setIsReviewing] = useState(false);
             const [loading, setLoading] = useState(true);
-            const [isAdding, setIsAdding] = useState(false);
+            const [activeTab, setActiveTab] = useState('home');
+            const [isReviewing, setIsReviewing] = useState(false);
             const [authError, setAuthError] = useState(null);
-            
-            const firebaseConfig = getFirebaseConfig();
-            const isDemoConfig = firebaseConfig.apiKey === "demo-key";
+            const [isAdding, setIsAdding] = useState(false);
 
-            // 1. Auth Setup
+            // 1. Listen for Auth State
             useEffect(() => {
-                const initAuth = async () => {
-                    if (isDemoConfig) {
-                        setLoading(false);
-                        return;
-                    }
-
-                    const unsubscribe = onAuthStateChanged(auth, (u) => {
-                        setUser(u);
-                        setLoading(false);
-                    });
-                    return () => unsubscribe();
-                };
-                initAuth();
-            }, [isDemoConfig]);
-
-            // 2. Data Fetching
-            useEffect(() => {
-                if (!user || isDemoConfig) return;
-                
-                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'));
-                
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                const data = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                setItems(data);
-                }, (error) => {
-                console.error("Snapshot error", error);
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setLoading(false);
                 });
-
                 return () => unsubscribe();
-            }, [user, isDemoConfig]);
+            }, []);
 
-            // 3. Actions
-            const handleAdd = async (newItem) => {
-                if (!user) {
-                    alert("Not connected to Cloud Brain. Please refresh or check your internet.");
-                    return;
-                }
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), newItem);
-                } catch (e) {
-                    console.error("Error adding doc:", e);
-                    alert("Could not save word:\n" + e.message);
-                }
+            // 2. Sync Data from Cloud
+            useEffect(() => {
+                if (!user) return;
+                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setItems(data);
+                }, (err) => console.error("Sync Error:", err));
+                return () => unsubscribe();
+            }, [user]);
+
+            // 3. Cloud Actions
+            const handleAdd = async (data) => {
+                // AUTO-SAVE: This sends data directly to Firebase
+                if(user) await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), data);
             };
-
             const handleDelete = async (id) => {
-                if (!user) return;
-                try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id));
-                } catch (e) {
-                    console.error("Error deleting doc:", e);
-                    alert("Could not delete word:\n" + e.message);
-                }
+                if(user) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id));
+            };
+            const handleUpdateSRS = async (id, data) => {
+                if(user) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id), data);
             };
 
-            const handleUpdateSRS = async (id, srsData) => {
-                if (!user) return;
-                try {
-                const itemRef = doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id);
-                await updateDoc(itemRef, srsData);
-                } catch (e) {
-                console.error("Error updating SRS:", e);
-                }
-            };
-
-            // GOOGLE LOGIN LOGIC
-            const handleGoogleLogin = async () => {
-                // SAFETY CHECK: Does NOT work on file://
+            const handleLogin = async () => {
                 if (window.location.protocol === 'file:') {
-                    alert("Google Login Error:\n\nGoogle Login does NOT work when opening the file directly (file://).\n\nPlease use the 'Live Server' extension in VS Code to run this as a website (http://127.0.0.1).");
+                    alert("⚠️ Security Alert\n\nGoogle Login does not work on file://.\nPlease use the 'Live Server' extension in VS Code.");
                     return;
                 }
-
                 const provider = new GoogleAuthProvider();
-                setAuthError(null);
                 try {
-                    if (user && user.isAnonymous) {
-                        // LINK: Merge Guest Data -> Google Account
-                        await linkWithPopup(user, provider);
-                        alert("Success! Your vocabulary is now safely stored in your Google Account.");
-                    } else {
-                        // LOGIN: Just switch users
-                        await signInWithPopup(auth, provider);
-                    }
-                } catch (error) {
-                    if (error.code === 'auth/credential-already-in-use') {
-                        const proceed = confirm("This Google account is already used by another wallet. \n\nDo you want to switch to it? (You might lose current Guest words).");
-                        if (proceed) {
-                            await signInWithPopup(auth, provider);
-                        }
-                    } else {
-                        setAuthError("Login failed: " + error.message);
-                    }
-                }
-            };
-
-            const handleGuestLogin = async () => {
-                setAuthError(null);
-                try {
-                    await signInAnonymously(auth);
-                } catch (error) {
-                    setAuthError("Guest Login failed: " + error.message);
+                    await signInWithPopup(auth, provider);
+                } catch (err) {
+                    setAuthError(err.message);
                 }
             };
 
@@ -903,8 +791,10 @@
                 setIsAdding(true);
                 
                 const demoItems = [
-                    { type: 'synonym', mainText: 'Happy', related: ['Joyful', 'Ecstatic'], easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 },
-                    { type: 'antonym', mainText: 'Artificial', related: ['Natural'], easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 }
+                    { type: 'synonym', mainText: 'Happy', related: ['Joyful', 'Ecstatic', 'Content', 'Elated'], easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 },
+                    { type: 'antonym', mainText: 'Artificial', related: ['Natural'], easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 },
+                    { type: 'phrase', mainText: 'Could you do me a favor?', context: 'Polite Request', easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 },
+                    { type: 'phrase', mainText: 'It slipped my mind completely.', context: 'Apologizing for forgetting', easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 }
                 ];
 
                 for (const item of demoItems) {
@@ -913,79 +803,40 @@
                 setIsAdding(false);
             };
 
-            // If local and missing keys, show setup screen
-            if (isDemoConfig) {
-                return (
-                    <div className="h-screen flex items-center justify-center text-center p-8">
-                        <div>
-                            <h1 className="text-2xl font-bold mb-4">Configuration Needed</h1>
-                            <p>Please edit the HTML file and paste your Firebase keys.</p>
-                        </div>
-                    </div>
-                );
-            }
+            if (loading) return <div className="h-screen flex items-center justify-center text-indigo-400">Loading...</div>;
+            
+            // SHOW LOGIN PAGE IF NO USER
+            if (!user) return <LoginPage onLogin={handleLogin} error={authError} />;
 
-            const dueItems = items.filter(item => item.nextReview < Date.now());
+            // SHOW DASHBOARD IF LOGGED IN
+            const dueItems = items.filter(i => i.nextReview < Date.now());
 
-            if (loading) return (
-                <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-indigo-400 gap-4">
-                    <Brain className="w-12 h-12 animate-bounce" />
-                    <span className="font-bold text-lg animate-pulse">Loading FluencyFlow...</span>
-                </div>
-            );
-
-            // RENDER LANDING PAGE IF NOT LOGGED IN
-            if (!user) {
-                return (
-                    <LandingPage 
-                        onGoogleLogin={handleGoogleLogin} 
-                        onGuestLogin={handleGuestLogin}
-                        error={authError}
-                    />
-                );
-            }
-
-            // RENDER DASHBOARD IF LOGGED IN
             return (
                 <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 selection:bg-indigo-100 selection:text-indigo-900">
-                <Navigation 
-                    activeTab={activeTab} 
-                    setActiveTab={setActiveTab} 
-                    user={user}
-                    onLogin={handleGoogleLogin}
-                    onLogout={handleLogout}
-                />
-                
-                <main className="max-w-6xl mx-auto p-4 md:p-8 mt-4">
-                    {activeTab === 'home' && (
-                    <Dashboard 
-                        items={items} 
-                        dueCount={dueItems.length} 
-                        onReview={() => setIsReviewing(true)}
-                        onLoadDemo={handleLoadDemo}
-                        isAdding={isAdding}
-                        user={user}
-                        onLogin={handleGoogleLogin}
-                    />
-                    )}
-                    {activeTab === 'synonyms' && (
-                    <SynonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
-                    )}
-                    {activeTab === 'antonyms' && (
-                    <AntonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
-                    )}
-                    {activeTab === 'phrases' && (
-                    <PhraseManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
-                    )}
-                </main>
+                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} />
 
-                {isReviewing && (
-                    <ReviewSession 
-                    dueItems={dueItems} 
-                    onClose={() => setIsReviewing(false)} 
-                    onComplete={handleUpdateSRS}
-                    />
-                )}
+                    <main className="max-w-6xl mx-auto p-4 md:p-8 mt-4">
+                        {activeTab === 'home' && (
+                            <Dashboard 
+                                items={items} 
+                                dueCount={dueItems.length} 
+                                onReview={() => setIsReviewing(true)} 
+                                onLoadDemo={handleLoadDemo}
+                                isAdding={isAdding}
+                            />
+                        )}
+                        {activeTab === 'synonyms' && (
+                            <SynonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
+                        )}
+                        {activeTab === 'antonyms' && (
+                            <AntonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
+                        )}
+                        {activeTab === 'phrases' && (
+                            <PhraseManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
+                        )}
+                    </main>
+
+                    {isReviewing && <ReviewSession dueItems={dueItems} onClose={() => setIsReviewing(false)} onComplete={handleUpdateSRS} />}
                 </div>
             );
         };
