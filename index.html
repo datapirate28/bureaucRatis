@@ -19,15 +19,85 @@
     }
     </script>
 
-    <!-- 3. Babel for JSX compilation (Pinned Version) -->
+    <!-- 3. Babel for JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
 
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Smooth fade for elements */
+        .fade-enter { opacity: 0; transform: translateY(10px); }
+        .fade-enter-active { opacity: 1; transform: translateY(0); transition: opacity 300ms, transform 300ms; }
+        
+        /* Creative Nav Blur - Light */
+        .nav-glass-light {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Creative Nav Blur - Dark (Redesigned) */
+        .nav-glass-dark {
+            background: rgba(10, 10, 10, 0.5); 
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Content Glass Panels */
+        .glass-panel-light {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .glass-panel-dark {
+            background: rgba(20, 20, 25, 0.6);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .text-shadow {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Custom Animations */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        .animate-float-delayed {
+            animation: float 6s ease-in-out 3s infinite;
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up {
+            animation: slideUp 0.8s ease-out forwards;
+        }
+
+        /* Stagger Delays */
+        .delay-100 { animation-delay: 100ms; }
+        .delay-200 { animation-delay: 200ms; }
+        .delay-300 { animation-delay: 300ms; }
+        .delay-500 { animation-delay: 500ms; }
+        .delay-700 { animation-delay: 700ms; }
+        .delay-1000 { animation-delay: 1000ms; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="font-sans overflow-x-hidden transition-colors duration-500">
     <div id="root"></div>
 
     <!-- Error Handler -->
@@ -41,15 +111,18 @@
 
     <!-- 4. Application Logic -->
     <script type="text/babel" data-type="module" data-presets="react">
-        import React, { useState, useEffect, useMemo } from 'react';
+        import React, { useState, useEffect, useMemo, useRef } from 'react';
         import ReactDOM from 'react-dom/client';
         import { 
             BookOpen, Repeat, Link as LinkIcon, ArrowLeftRight, MessageCircle, 
             Plus, Check, X, Save, Trash2, Brain, TrendingUp, Clock, 
-            Search, Sparkles, Zap, Layers, Loader2, AlertTriangle, User, LogOut, ShieldCheck, LogIn
+            Search, Sparkles, Zap, Layers, Loader2, AlertTriangle, User, 
+            LogOut, ShieldCheck, LogIn, ChevronDown, Play, ArrowLeft, Trophy, 
+            Book, Mic, Volume2, Wand2, Star, ChevronRight, Activity, Grid, List,
+            Moon, Sun
         } from 'lucide-react';
         
-        // Import Firebase Auth with Google Provider
+        // Import Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
         import { 
             getAuth, 
@@ -69,6 +142,8 @@
             onSnapshot, 
             deleteDoc, 
             doc, 
+            getDoc,
+            setDoc,
             updateDoc,
             serverTimestamp 
         } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
@@ -78,8 +153,7 @@
             if (typeof __firebase_config !== 'undefined') {
                 return JSON.parse(__firebase_config);
             }
-            
-            // YOUR REAL KEYS (bureaucratis-6a362)
+            // Fallback for demo/dev if config not injected
             return {
                 apiKey: "AIzaSyDHD8AhAFmlH9Cr06dBGTS9Lpvqvs9jNtM",
                 authDomain: "bureaucratis-6a362.firebaseapp.com",
@@ -95,18 +169,15 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fluency-flow-standalone';
+        const appId = 'fluency-flow-standalone';
 
-        // --- SRS ALGORITHM UTILS ---
+        // --- UTILS ---
         const calculateNextReview = (rating, previousInterval, previousEasiness) => {
             let newInterval;
             let newEasiness = previousEasiness + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02));
             if (newEasiness < 1.3) newEasiness = 1.3;
-
-            if (rating < 3) {
-                newInterval = 1; 
-            } else {
+            if (rating < 3) { newInterval = 1; } 
+            else {
                 if (previousInterval === 0) newInterval = 1;
                 else if (previousInterval === 1) newInterval = 6;
                 else newInterval = Math.round(previousInterval * newEasiness);
@@ -123,103 +194,352 @@
             return `in ${hours}h`;
         };
 
+        const speakText = (text) => {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Text-to-speech not supported in this browser.");
+            }
+        };
+
+        const getMasteryStars = (interval) => {
+            if (interval > 21) return 5;
+            if (interval > 10) return 4;
+            if (interval > 4) return 3;
+            if (interval > 1) return 2;
+            return 1;
+        };
+
         // --- COMPONENTS ---
 
-        const LoginPage = ({ onLogin, error }) => (
-            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center font-sans">
-                <div className="max-w-md w-full">
-                    <div className="flex justify-center mb-8">
-                        <div className="bg-indigo-600 p-4 rounded-2xl shadow-xl shadow-indigo-500/20">
-                            <Brain className="w-16 h-16 text-white" />
-                        </div>
-                    </div>
-                    
-                    <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
-                        bureauc<span className="text-indigo-400">Ratis</span>
-                    </h1>
-                    <p className="text-slate-400 text-lg mb-10 leading-relaxed">
-                        Master your vocabulary with spaced repetition. Store your words in the cloud and never forget a phrase again.
-                    </p>
+        const ItemCard = ({ title, subtitle, icon: Icon, colorClass, onDelete, onSpeak, interval, type, theme }) => {
+            const gradients = {
+                voca: "from-indigo-500 to-blue-500",
+                synonym: "from-violet-500 to-purple-500",
+                antonym: "from-rose-500 to-pink-500",
+                phrase: "from-amber-400 to-orange-500"
+            };
 
-                    <div className="space-y-4">
-                        <button 
-                            onClick={onLogin}
-                            className="w-full bg-white text-slate-900 font-bold text-lg py-4 rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-3 shadow-lg"
-                        >
-                            <svg className="w-6 h-6" viewBox="0 0 24 24">
-                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                            </svg>
-                            Sign in with Google
-                        </button>
-                    </div>
+            const bgGradient = gradients[type] || "from-slate-500 to-slate-600";
+            
+            // Modern Dark Mode Card: Darker bg, subtle border, deeper shadow
+            const cardClass = theme === 'dark' 
+                ? "bg-[#16161a]/60 border-white/5 shadow-lg hover:bg-[#1c1c21]/80 hover:shadow-indigo-500/10 hover:border-white/10" 
+                : "bg-white border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.1)]";
 
-                    {error && (
-                        <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                            {error}
-                        </div>
-                    )}
-
-                    <p className="mt-8 text-slate-500 text-xs">
-                        By using bureaucRatis, you agree to become fluent.
-                    </p>
-                </div>
-            </div>
-        );
-
-        const Navigation = ({ activeTab, setActiveTab, user, onLogout }) => {
-            const navItems = [
-                { id: 'home', label: 'Dashboard', icon: BookOpen },
-                { id: 'synonyms', label: 'Synonyms', icon: LinkIcon },
-                { id: 'antonyms', label: 'Antonyms', icon: ArrowLeftRight },
-                { id: 'phrases', label: 'Phrases', icon: MessageCircle },
-            ];
+            const textMain = theme === 'dark' ? "text-gray-100" : "text-slate-800";
+            const textSub = theme === 'dark' ? "text-gray-400" : "text-slate-500";
+            const btnBg = theme === 'dark' ? "bg-white/5 hover:bg-indigo-500/20 text-gray-400 hover:text-indigo-300" : "bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600";
 
             return (
-                <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-                <div className="max-w-6xl mx-auto px-4">
-                    <div className="flex justify-between items-center h-16">
-                    {/* Logo Area */}
-                    <div className="flex items-center gap-2 font-black text-xl md:text-2xl bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600 cursor-pointer shrink-0" onClick={() => setActiveTab('home')}>
-                        <Brain className="w-8 h-8 text-indigo-600" />
-                        <span className="hidden md:inline">bureaucRatis</span>
+                <div className={`${cardClass} p-4 rounded-3xl border flex items-center gap-5 transition-all duration-300 group`}>
+                    <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-md shrink-0`}>
+                        <Icon className="w-8 h-8" />
                     </div>
-
-                    {/* Nav Items */}
-                    <div className="flex space-x-1 overflow-x-auto no-scrollbar mx-2">
-                        {navItems.map((item) => (
-                        <button
-                            key={item.id}
-                            onClick={() => setActiveTab(item.id)}
-                            className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-full text-xs md:text-sm font-medium transition-all duration-200 ${
-                            activeTab === item.id
-                                ? 'bg-indigo-600 text-white shadow-md transform scale-105'
-                                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-                            }`}
-                        >
-                            <item.icon className="w-4 h-4" />
-                            <span className="hidden sm:inline">{item.label}</span>
-                        </button>
-                        ))}
+                    <div className="flex-1 min-w-0">
+                        <h4 className={`text-xl font-bold ${textMain} truncate`}>{title}</h4>
+                        <p className={`${textSub} text-sm font-medium mt-1 truncate`}>{subtitle}</p>
                     </div>
-
-                    {/* User Profile */}
-                    <div>
-                        <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-slate-200 transition-colors" title="Log out">
-                            <img src={user?.photoURL} className="w-4 h-4 rounded-full" onError={(e) => e.target.style.display='none'} />
-                            <span>{user?.displayName?.split(' ')[0] || 'User'}</span>
-                            <LogOut className="w-3 h-3 ml-1" />
+                    <div className="flex flex-col gap-2">
+                        {onSpeak && (
+                            <button onClick={onSpeak} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
+                                <Volume2 className="w-5 h-5" />
+                            </button>
+                        )}
+                        <button onClick={onDelete} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 ${theme === 'dark' ? 'bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400' : 'bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600'}`}>
+                            <Trash2 className="w-5 h-5" />
                         </button>
                     </div>
-                    </div>
-                </div>
                 </div>
             );
         };
 
-        const Dashboard = ({ items, onReview, dueCount, onLoadDemo, isAdding }) => {
+        // --- LOGIN PAGE DESIGN (RESPONSIVE) ---
+        const LoginPage = ({ onLogin, error }) => (
+            <div className="min-h-screen flex flex-col items-center justify-center font-sans bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 relative overflow-hidden p-4 sm:p-6 md:p-8">
+                
+                {/* Background decorative elements */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                    <div className="absolute top-[10%] left-[10%] w-64 h-64 bg-white/40 rounded-full blur-3xl animate-pulse"></div>
+                    <div className="absolute bottom-[10%] right-[10%] w-80 h-80 bg-purple-300/30 rounded-full blur-3xl animate-float"></div>
+                    <div className="absolute top-[40%] left-[60%] w-40 h-40 bg-pink-300/30 rounded-full blur-3xl"></div>
+                </div>
+
+                {/* Main Content Container - switched to lg:flex-row for better tablet/desktop spacing */}
+                <div className="relative z-10 w-full max-w-7xl flex flex-col lg:flex-row items-center justify-between gap-10 lg:gap-16">
+                    
+                    {/* Left/Top Side: Visuals & Brand */}
+                    <div className="flex-1 w-full flex flex-col items-center lg:items-start text-center lg:text-left">
+                        
+                        {/* Brand Logo - Centered on mobile, Left on Desktop */}
+                        <div className="mb-6 md:mb-10 animate-slide-up self-center lg:self-start">
+                            {/* PLACEHOLDER FOR LOGO IMAGE - UPLOAD YOUR LOGO HERE */}
+                            <img src="2.jpg" alt="FluencyFlow Logo" className="h-16 md:h-20 w-auto object-contain rounded-full shadow-2xl" />
+                        </div>
+
+                        <h2 className="font-black text-slate-900 mb-4 md:mb-6 leading-tight animate-slide-up delay-100 flex flex-col gap-2">
+                            {/* Responsive Text Sizes: starts smaller on mobile, grows on larger screens */}
+                            <span className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-slate-900 tracking-tight">bureaucRatis</span>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold">The Smart Way</span>
+                        </h2>
+                        
+                        <p className="text-slate-600 text-base sm:text-lg md:text-xl leading-relaxed mb-6 md:mb-8 max-w-lg font-medium animate-slide-up delay-200">
+                            <span className="font-bold text-slate-400 hover:text-indigo-600 hover:cursor-pointer transition-all duration-1000">By Hashmatullah Naybi</span>
+                        </p>
+
+                        {/* Call to Action Section */}
+                        <div className="w-full max-w-md animate-slide-up delay-300">
+                            <div className="bg-white/60 backdrop-blur-xl border border-white/60 p-6 md:p-8 rounded-[2rem] shadow-xl relative overflow-hidden group hover:bg-white/70 transition-all duration-300">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+                                
+                                <p className="text-center text-slate-800 font-bold text-base md:text-lg mb-6">
+                                    Continue with Google — <span className="text-indigo-600 block sm:inline">Make a free account.</span>
+                                </p>
+
+                                <button onClick={onLogin} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 md:py-4 rounded-xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] shadow-lg active:scale-95 group-hover:shadow-indigo-500/20 text-sm md:text-base">
+                                    <div className="p-1 md:p-1.5 bg-white rounded-full">
+                                        <svg className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                                    </div>
+                                    <span>Continue with Google</span>
+                                </button>
+                                
+                                {error && <div className="mt-4 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-lg text-center border border-red-100">{error}</div>}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right/Bottom Side: Animation */}
+                    <div className="flex-1 flex justify-center items-center relative animate-float-delayed w-full mt-10 lg:mt-0">
+                         {/* Abstract 3D-ish Composition - Responsive sizes */}
+                         <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96">
+                            
+                            {/* Main Purple Block (Brain) */}
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-40 sm:w-48 sm:h-48 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[2rem] shadow-2xl flex items-center justify-center z-20 animate-float border-4 border-white/20">
+                                <Brain className="w-20 h-20 sm:w-24 sm:h-24 text-white stroke-[1.5]" />
+                            </div>
+
+                            {/* Floating Elements mimicking screenshot - Repositioned for responsiveness */}
+                            
+                            {/* Pink Circle */}
+                            <div className="absolute top-0 left-4 sm:left-10 w-12 h-12 sm:w-16 sm:h-16 bg-pink-400 rounded-full shadow-lg opacity-90 animate-float-delayed" style={{animationDuration: '5s'}}></div>
+                            
+                            {/* White Square (Book) */}
+                            <div className="absolute top-4 right-4 sm:right-10 w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-xl flex items-center justify-center animate-float" style={{animationDuration: '7s', animationDelay: '1s'}}>
+                                <BookOpen className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-500" />
+                            </div>
+
+                            {/* White Square (Link) */}
+                            <div className="absolute bottom-6 sm:bottom-10 left-0 w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl shadow-xl flex items-center justify-center animate-float-delayed" style={{animationDuration: '6s', animationDelay: '0.5s'}}>
+                                <LinkIcon className="w-8 h-8 sm:w-10 sm:h-10 text-violet-500" />
+                            </div>
+
+                            {/* Blue Diamond */}
+                            <div className="absolute bottom-16 sm:bottom-20 right-4 w-10 h-10 sm:w-14 sm:h-14 bg-indigo-400 rounded-xl shadow-lg transform rotate-45 animate-float" style={{animationDuration: '4s', animationDelay: '1.5s'}}></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme }) => {
+            const navItems = [
+                { id: 'dashboard', label: 'Dashboard', icon: Grid },
+                { id: 'voca', label: 'Vocab', icon: Book }, // Changed from "Voca" to "Vocab"
+                { id: 'synonyms', label: 'Synonyms', icon: LinkIcon },
+                { id: 'antonyms', label: 'Antonyms', icon: ArrowLeftRight },
+                { id: 'phrases', label: 'Phrases', icon: MessageCircle },
+            ];
+            const level = Math.floor((items?.length || 0) / 5) + 1;
+
+            const navClass = theme === 'dark' ? 'nav-glass-dark' : 'nav-glass-light';
+            // Dark Mode: White text for base. Light Mode: Slate 600.
+            const textBase = theme === 'dark' ? 'text-gray-300' : 'text-slate-600';
+            const textHover = theme === 'dark' ? 'hover:text-white hover:bg-white/10' : 'hover:text-slate-900 hover:bg-white/40';
+            // Dark Mode Active: Bright Indigo gradient or solid punchy color.
+            const activeClass = theme === 'dark' 
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)] border border-white/10' 
+                : 'bg-slate-900 text-white shadow-xl';
+            
+            const logoColor = theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600';
+            // Dark Mode Logo: Lighter gradient to pop against dark bg
+            const logoGradient = theme === 'dark' ? 'bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300' : 'bg-gradient-to-r from-indigo-600 to-violet-600';
+
+            return (
+                <>
+                    <div className="fixed top-0 left-0 right-0 z-50 px-4 py-4 md:px-8">
+                        <div className={`max-w-6xl mx-auto ${navClass} rounded-full px-6 py-3 flex justify-between items-center transition-all duration-300`}>
+                            <div className={`flex items-center gap-2 font-black text-xl md:text-2xl cursor-pointer shrink-0 tracking-tight text-transparent bg-clip-text ${logoGradient}`} onClick={() => setActiveTab('landing')}>
+                                <img src="2.jpg" alt="bureaucRatis Logo" className="w-[40px] h-[40px] rounded-full" />
+                                <span className="hidden md:inline">bureaucRatis</span>
+                            </div>
+                            
+                            <div className="flex space-x-1 overflow-x-auto no-scrollbar mx-4">
+                                {navItems.map((item) => (
+                                <button 
+                                    key={item.id} 
+                                    onClick={() => setActiveTab(item.id)} 
+                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-300 ${
+                                        activeTab === item.id 
+                                        ? `${activeClass} scale-105` 
+                                        : `${textBase} ${textHover}`
+                                    }`}
+                                >
+                                    <item.icon className="w-4 h-4" /> <span className="hidden sm:inline">{item.label}</span>
+                                </button>
+                                ))}
+                            </div>
+
+                            <div className="relative group z-50">
+                                {user?.isAnonymous ? (
+                                    <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold bg-white/20 px-4 py-2 rounded-full hover:bg-white/30 transition-colors border border-white/20 text-current"><User className="w-4 h-4" /><span>Guest</span></button>
+                                ) : (
+                                    <div>
+                                        <button className={`flex items-center gap-2 text-xs font-bold ${textBase} bg-white/5 border border-white/10 px-3 py-1.5 rounded-full hover:bg-white/10 transition-all backdrop-blur-md shadow-sm`}>
+                                            <img src={user?.photoURL} className="w-7 h-7 rounded-full border border-white/20" onError={(e) => e.target.style.display='none'} />
+                                            <span>{user?.displayName?.split(' ')[0] || 'User'}</span><ChevronDown className="w-3 h-3 opacity-70" />
+                                        </button>
+                                        <div className="absolute right-0 top-full mt-3 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right">
+                                            <div className={`${theme === 'dark' ? 'bg-[#0f172a]/95 border-white/10' : 'bg-white/90 border-white'} backdrop-blur-xl rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] border p-5 overflow-hidden relative`}>
+                                                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <div className={`w-12 h-12 ${theme === 'dark' ? 'bg-white/10 text-indigo-300' : 'bg-indigo-50 text-indigo-600'} rounded-2xl flex items-center justify-center text-2xl shadow-sm animate-pulse`}>🦊</div>
+                                                    <div><div className={`text-[10px] font-bold uppercase tracking-wider ${theme==='dark'?'text-gray-400':'text-slate-400'}`}>Level {level} Scholar</div><div className={`font-bold text-sm ${theme==='dark'?'text-white':'text-slate-800'}`}>Hi, {user?.displayName?.split(' ')[0]}!</div></div>
+                                                </div>
+                                                <div className={`${theme==='dark'?'bg-white/5 border-white/5':'bg-slate-50 border-slate-100'} rounded-2xl p-3 mb-4 flex items-center justify-between border`}>
+                                                    <div className="text-left"><div className="text-[10px] text-slate-500 font-bold uppercase">Words</div><div className={`text-xl font-black leading-none ${theme==='dark'?'text-indigo-400':'text-indigo-600'}`}>{items?.length || 0}</div></div>
+                                                    <div className={`text-left border-l ${theme==='dark'?'border-white/10':'border-slate-200'} pl-3`}><div className="text-[10px] text-slate-500 font-bold uppercase">Streak</div><div className="text-xl font-black text-orange-500 leading-none">🔥 {streak}</div></div>
+                                                </div>
+                                                <button onClick={onLogout} className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all hover:scale-[1.02] shadow-lg ${theme==='dark'?'bg-indigo-600 text-white hover:bg-indigo-500':'bg-slate-900 text-white hover:bg-slate-800'}`}><LogOut className="w-3 h-3" /> Sign Out</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    {/* Floating Theme Toggle Beneath Nav */}
+                    <div className="fixed top-24 right-4 md:right-8 z-40 animate-slide-up delay-500">
+                        <button 
+                            onClick={toggleTheme} 
+                            className={`p-2.5 rounded-full transition-all duration-300 shadow-xl border backdrop-blur-md ${theme === 'dark' ? 'bg-[#0f172a]/80 border-white/10 text-yellow-400 hover:bg-[#1e293b] hover:border-yellow-400/50 hover:shadow-yellow-400/20' : 'bg-white/80 border-white text-indigo-600 hover:bg-white'}`}
+                            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                        >
+                            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                        </button>
+                    </div>
+                </>
+            );
+        };
+
+        // ... LandingPage, Dashboard, VocaManager ...
+        // (Applying theme props to all of them)
+
+        const LandingPage = ({ setActiveTab, theme }) => {
+            const textColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const subTextColor = theme === 'dark' ? 'text-gray-300' : 'text-slate-600';
+            const cardBgClass = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
+            const iconBg = theme === 'dark' ? 'bg-slate-800 text-indigo-400' : 'bg-indigo-100 text-indigo-600';
+            
+            // Dark mode Hero text gradient: Brighter to stand out
+            const heroGradient = theme === 'dark' ? 'from-indigo-300 via-cyan-300 to-emerald-300' : 'from-indigo-100 to-purple-200';
+
+            return (
+                <div className="flex flex-col min-h-screen pt-44 pb-12 px-4 relative z-10">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8 mb-20">
+                        <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter drop-shadow-sm leading-tight max-w-5xl mx-auto opacity-0 animate-slide-up">
+                            Solidify Your <br/>
+                            <span className={`text-transparent bg-clip-text bg-gradient-to-r ${heroGradient}`}>Vocabulary</span>
+                        </h1>
+                        <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto font-light leading-relaxed opacity-0 animate-slide-up delay-200">
+                            The simple way to master words, phrases, synonyms, and antonyms. Don’t just learn new vocabulary—keep it forever.
+                        </p>
+                        <div className="mt-8 opacity-0 animate-slide-up delay-300">
+                            <button onClick={() => setActiveTab('dashboard')} className="group px-12 py-5 rounded-2xl font-bold text-xl bg-white text-indigo-900 shadow-xl hover:shadow-white/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 relative overflow-hidden">
+                                <span className="relative z-10">Start Learning Now</span>
+                                <ArrowLeft className="w-5 h-5 rotate-180 relative z-10 group-hover:translate-x-1 transition-transform" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-white via-indigo-50 to-white opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Key Features Section */}
+                    <div className="max-w-7xl mx-auto w-full mb-20">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className={`${cardBgClass} p-8 rounded-[2rem] hover:transform hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl opacity-0 animate-slide-up delay-500`}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 animate-float ${theme==='dark'?'bg-indigo-500/20 text-indigo-300':'bg-indigo-100 text-indigo-600'}`}>
+                                    <Book className="w-8 h-8" />
+                                </div>
+                                <h3 className={`text-2xl font-bold mb-3 ${textColor}`}>Build Your Dictionary</h3>
+                                <p className={`${subTextColor} leading-relaxed`}>Save every new word and phrase you encounter in one organized, beautiful place.</p>
+                            </div>
+                            <div className={`${cardBgClass} p-8 rounded-[2rem] hover:transform hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl opacity-0 animate-slide-up delay-700`}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 animate-float-delayed ${theme==='dark'?'bg-purple-500/20 text-purple-300':'bg-purple-100 text-purple-600'}`}>
+                                    <LinkIcon className="w-8 h-8" />
+                                </div>
+                                <h3 className={`text-2xl font-bold mb-3 ${textColor}`}>Connect the Dots</h3>
+                                <p className={`${subTextColor} leading-relaxed`}>Link words to their synonyms and antonyms so you understand the exact meaning and nuance.</p>
+                            </div>
+                            <div className={`${cardBgClass} p-8 rounded-[2rem] hover:transform hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl opacity-0 animate-slide-up delay-1000`}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 animate-float ${theme==='dark'?'bg-emerald-500/20 text-emerald-300':'bg-emerald-100 text-emerald-600'}`}>
+                                    <Brain className="w-8 h-8" />
+                                </div>
+                                <h3 className={`text-2xl font-bold mb-3 ${textColor}`}>Test Your Memory</h3>
+                                <p className={`${subTextColor} leading-relaxed`}>Use our built-in tools to practice and ensure you never forget what you have learned.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* How It Works Section */}
+                    <div className="max-w-5xl mx-auto w-full mb-20 text-center">
+                        <h2 className="text-4xl font-bold text-white mb-12 opacity-0 animate-slide-up delay-1000">How It Works</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="bg-white/10 backdrop-blur-sm p-6 rounded-3xl border border-white/10 opacity-0 animate-slide-up delay-[1100ms] hover:bg-white/20 transition-colors duration-300">
+                                <div className="text-5xl font-black text-white/20 mb-4">01</div>
+                                <h4 className="text-xl font-bold text-white mb-2">Add</h4>
+                                <p className="text-white/80">Input a new word or phrase quickly.</p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur-sm p-6 rounded-3xl border border-white/10 opacity-0 animate-slide-up delay-[1200ms] hover:bg-white/20 transition-colors duration-300">
+                                <div className="text-5xl font-black text-white/20 mb-4">02</div>
+                                <h4 className="text-xl font-bold text-white mb-2">Refine</h4>
+                                <p className="text-white/80">Add details like definitions, synonyms, and antonyms.</p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur-sm p-6 rounded-3xl border border-white/10 opacity-0 animate-slide-up delay-[1300ms] hover:bg-white/20 transition-colors duration-300">
+                                <div className="text-5xl font-black text-white/20 mb-4">03</div>
+                                <h4 className="text-xl font-bold text-white mb-2">Solidify</h4>
+                                <p className="text-white/80">Practice regularly until it sticks.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer CTA */}
+                    <div className="text-center py-10 border-t border-white/10 opacity-0 animate-slide-up delay-[1400ms]">
+                        <h3 className="text-12xl font-bold text-white mb-6"> "My words fly up, my thoughts remain below. Words without thoughts never to heaven go."</h3>
+                        <p className="text-white/80 mb-6">— William Shakespeare</p>
+                    </div>
+                </div>
+            )
+        }
+
+        // Generic Container for all managers to handle Theme
+        const ManagerContainer = ({ children, title, subtitle, theme }) => {
+            const containerClass = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
+            const titleColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const subColor = theme === 'dark' ? 'text-gray-400' : 'text-slate-600';
+
+            return (
+                <div className={`${containerClass} p-8 rounded-[2rem] shadow-xl transition-all duration-500`}>
+                    <div className="mb-8">
+                        <h3 className={`text-3xl font-black ${titleColor} tracking-tight mb-2`}>{title}</h3>
+                        <p className={`${subColor} font-medium`}>{subtitle}</p>
+                    </div>
+                    {children}
+                </div>
+            );
+        };
+
+        const Dashboard = ({ items, onReview, dueCount, onLoadDemo, isAdding, onFlashcards, theme }) => {
             const stats = useMemo(() => {
                 const total = items.length;
                 const mastered = items.filter(i => i.interval > 21).length;
@@ -227,500 +547,463 @@
                 return { total, mastered, learning };
             }, [items]);
 
-            return (
-                <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-                <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 rounded-3xl p-8 text-white shadow-xl">
-                    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-                    <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl"></div>
-                    
-                    <div className="relative z-10">
-                    <h2 className="text-3xl font-bold mb-2 tracking-tight">Welcome back!</h2>
-                    <p className="opacity-90 mb-8 text-indigo-100 text-lg max-w-lg">
-                        You have <span className="font-bold text-white bg-white/20 px-2 py-0.5 rounded-lg">{dueCount} cards</span> waiting for review.
-                    </p>
-                    
-                    <div className="flex gap-3">
-                        <button
-                        onClick={onReview}
-                        disabled={dueCount === 0}
-                        className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-bold transition-all shadow-lg transform active:scale-95 ${
-                            dueCount > 0 
-                            ? 'bg-white text-indigo-600 hover:bg-indigo-50 cursor-pointer' 
-                            : 'bg-black/20 text-white/50 cursor-not-allowed'
-                        }`}
-                        >
-                        <Repeat className="w-5 h-5" />
-                        {dueCount > 0 ? 'Start Review Session' : 'All Caught Up!'}
-                        </button>
-                        
-                        {items.length === 0 && (
-                        <button 
-                            onClick={onLoadDemo}
-                            disabled={isAdding}
-                            className="flex items-center gap-2 px-6 py-4 rounded-2xl font-bold bg-indigo-500/30 text-white hover:bg-indigo-500/40 border border-white/20 transition-all disabled:opacity-50"
-                        >
-                            {isAdding ? <Loader2 className="w-5 h-5 animate-spin"/> : <Sparkles className="w-5 h-5" />}
-                            Load Example Data
-                        </button>
-                        )}
-                    </div>
-                    </div>
-                </div>
+            const [showFlashcardModal, setShowFlashcardModal] = useState(false);
+            const [showReviewModal, setShowReviewModal] = useState(false);
+            const dueItems = items.filter(i => i.nextReview < Date.now());
+            const vocaDue = dueItems.filter(i => i.type === 'voca').length;
+            const synonymDue = dueItems.filter(i => i.type === 'synonym').length;
+            const antonymDue = dueItems.filter(i => i.type === 'antonym').length;
+            const phraseDue = dueItems.filter(i => i.type === 'phrase').length;
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4">
-                    <div className="bg-blue-50 p-3 rounded-xl">
-                        <Layers className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                        <div className="text-3xl font-bold text-slate-800">{stats.total}</div>
-                        <div className="text-sm text-slate-500 font-medium">Total Items</div>
-                    </div>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4">
-                    <div className="bg-green-50 p-3 rounded-xl">
-                        <Check className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div>
-                        <div className="text-3xl font-bold text-slate-800">{stats.mastered}</div>
-                        <div className="text-sm text-slate-500 font-medium">Mastered ({'>'}21 days)</div>
-                    </div>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4">
-                    <div className="bg-amber-50 p-3 rounded-xl">
-                        <Zap className="w-6 h-6 text-amber-600" />
-                    </div>
-                    <div>
-                        <div className="text-3xl font-bold text-slate-800">{stats.learning}</div>
-                        <div className="text-sm text-slate-500 font-medium">Learning</div>
-                    </div>
-                    </div>
-                </div>
-                
-                <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-                    <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-indigo-500" /> Recently Added
-                    </h3>
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</span>
-                    </div>
-                    
-                    <div className="space-y-4">
-                    {items.slice(0, 5).map(item => (
-                        <div key={item.id} className="group flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl border border-transparent hover:border-slate-200 transition-all cursor-default">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-2 h-10 rounded-full ${
-                            item.type === 'synonym' ? 'bg-indigo-400' :
-                            item.type === 'antonym' ? 'bg-rose-400' : 'bg-amber-400'
-                            }`}></div>
-                            <div>
-                            <div className="font-bold text-slate-700 text-lg">{item.mainText}</div>
-                            <div className="text-xs text-slate-400 font-medium uppercase tracking-wide flex gap-2">
-                                {item.type}
-                                {item.context && <span className="text-amber-600">• {item.context}</span>}
+            const cardBg = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
+            const textColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const subText = theme === 'dark' ? 'text-gray-400' : 'text-slate-500';
+
+            return (
+                <div className="space-y-8 animate-in fade-in duration-500 pb-10 pt-24 max-w-6xl mx-auto px-4">
+                    {/* Flashcard Modal */}
+                    {showFlashcardModal && (
+                        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in zoom-in-95">
+                            <div className={`${theme === 'dark' ? 'bg-[#0f172a] border-white/10' : 'bg-white'} border rounded-3xl p-8 max-w-sm w-full shadow-2xl relative`}>
+                                <button onClick={() => setShowFlashcardModal(false)} className={`absolute top-4 right-4 ${theme==='dark'?'text-gray-400 hover:text-white':'text-slate-400 hover:text-slate-600'}`}><X className="w-6 h-6"/></button>
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-4"><Layers className="w-8 h-8" /></div>
+                                    <h3 className={`text-2xl font-black ${theme==='dark'?'text-white':'text-slate-800'}`}>Flashcard Practice</h3>
+                                    <p className="text-slate-500 mt-2">Drill 20 random cards. No grading.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <button onClick={() => { onFlashcards('voca'); setShowFlashcardModal(false); }} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-indigo-100"><Book className="w-5 h-5"/> Vocabulary</button>
+                                    <button onClick={() => { onFlashcards('synonym'); setShowFlashcardModal(false); }} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-indigo-100"><LinkIcon className="w-5 h-5"/> Synonyms</button>
+                                    <button onClick={() => { onFlashcards('antonym'); setShowFlashcardModal(false); }} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-rose-100"><ArrowLeftRight className="w-5 h-5"/> Antonyms</button>
+                                    <button onClick={() => { onFlashcards('phrase'); setShowFlashcardModal(false); }} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-indigo-100"><MessageCircle className="w-5 h-5"/> Phrases</button>
+                                </div>
                             </div>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className={`text-sm font-bold ${item.nextReview < Date.now() ? 'text-red-500' : 'text-emerald-500'}`}>
-                            {getRelativeTime(item.nextReview)}
-                            </div>
-                            <div className="text-xs text-slate-400">Next Review</div>
-                        </div>
-                        </div>
-                    ))}
-                    {items.length === 0 && (
-                        <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                        <p>Your mind palace is empty.</p>
-                        <p className="text-sm mt-2">Add items or click "Load Example Data" above.</p>
                         </div>
                     )}
+                    
+                    {/* Review Modal */}
+                    {showReviewModal && (
+                        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in zoom-in-95">
+                            <div className={`${theme === 'dark' ? 'bg-[#0f172a] border-white/10' : 'bg-white'} border rounded-3xl p-8 max-w-sm w-full shadow-2xl relative`}>
+                                <button onClick={() => setShowReviewModal(false)} className={`absolute top-4 right-4 ${theme==='dark'?'text-gray-400 hover:text-white':'text-slate-400 hover:text-slate-600'}`}><X className="w-6 h-6"/></button>
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4"><Repeat className="w-8 h-8" /></div>
+                                    <h3 className={`text-2xl font-black ${theme==='dark'?'text-white':'text-slate-800'}`}>Spaced Repetition</h3>
+                                    <p className="text-slate-500 mt-2">Review due words and grade yourself.</p>
+                                </div>
+                                <div className="space-y-3">
+                                    <button onClick={() => { onReview('all'); setShowReviewModal(false); }} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-colors border border-slate-200"><Brain className="w-5 h-5"/> Review All ({dueItems.length})</button>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button onClick={() => { onReview('voca'); setShowReviewModal(false); }} disabled={vocaDue === 0} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors border border-indigo-100 disabled:opacity-50"><Book className="w-4 h-4"/> <span className="text-xs">Vocab({vocaDue})</span></button>
+                                        <button onClick={() => { onReview('synonym'); setShowReviewModal(false); }} disabled={synonymDue === 0} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors border border-indigo-100 disabled:opacity-50"><LinkIcon className="w-4 h-4"/> <span className="text-xs">Syn ({synonymDue})</span></button>
+                                        <button onClick={() => { onReview('antonym'); setShowReviewModal(false); }} disabled={antonymDue === 0} className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors border border-rose-100 disabled:opacity-50"><ArrowLeftRight className="w-4 h-4"/> <span className="text-xs">Ant ({antonymDue})</span></button>
+                                        <button onClick={() => { onReview('phrase'); setShowReviewModal(false); }} disabled={phraseDue === 0} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors border border-indigo-100 disabled:opacity-50"><MessageCircle className="w-4 h-4"/> <span className="text-xs">Phr ({phraseDue})</span></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Welcome Banner */}
+                    <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 rounded-[2.5rem] p-10 text-white shadow-2xl">
+                        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-60 h-60 bg-white/10 rounded-full blur-3xl"></div>
+                        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-60 h-60 bg-purple-500/20 rounded-full blur-3xl"></div>
+                        <div className="relative z-10">
+                            <h2 className="text-4xl font-bold mb-3 tracking-tight">Welcome back!</h2>
+                            <p className="opacity-90 mb-8 text-indigo-100 text-lg max-w-lg">You have <span className="font-bold text-white bg-white/20 px-3 py-1 rounded-lg backdrop-blur-sm">{dueCount} cards</span> waiting for review.</p>
+                            <div className="flex flex-wrap gap-4">
+                                <button onClick={() => setShowReviewModal(true)} disabled={dueCount === 0} className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-bold transition-all shadow-lg transform active:scale-95 ${dueCount > 0 ? 'bg-white text-indigo-600 hover:bg-indigo-50 cursor-pointer' : 'bg-black/20 text-white/50 cursor-not-allowed'}`}><Repeat className="w-5 h-5" /> {dueCount > 0 ? 'Start Review Session' : 'All Caught Up!'}</button>
+                                <button onClick={() => setShowFlashcardModal(true)} className="flex items-center gap-2 px-8 py-4 rounded-2xl font-bold bg-white/10 text-white hover:bg-white/20 border border-white/20 transition-all shadow-lg backdrop-blur-sm"><Layers className="w-5 h-5" /> Flashcards</button>
+                                {items.length === 0 && (
+                                <button onClick={onLoadDemo} disabled={isAdding} className="flex items-center gap-2 px-6 py-4 rounded-2xl font-bold bg-indigo-500/30 text-white hover:bg-indigo-500/40 border border-white/20 transition-all disabled:opacity-50">{isAdding ? <Loader2 className="w-5 h-5 animate-spin"/> : <Sparkles className="w-5 h-5" />} Load Example Data</button>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className={`${cardBg} p-6 rounded-[2rem] flex items-center gap-5 shadow-lg`}>
+                            <div className="bg-blue-500/10 p-4 rounded-2xl"><Layers className="w-8 h-8 text-blue-500" /></div>
+                            <div><div className={`text-4xl font-black ${textColor}`}>{stats.total}</div><div className={`text-sm font-bold uppercase tracking-wider ${subText}`}>Total Items</div></div>
+                        </div>
+                        <div className={`${cardBg} p-6 rounded-[2rem] flex items-center gap-5 shadow-lg`}>
+                            <div className="bg-green-500/10 p-4 rounded-2xl"><Check className="w-8 h-8 text-green-500" /></div>
+                            <div><div className={`text-4xl font-black ${textColor}`}>{stats.mastered}</div><div className={`text-sm font-bold uppercase tracking-wider ${subText}`}>Mastered</div></div>
+                        </div>
+                        <div className={`${cardBg} p-6 rounded-[2rem] flex items-center gap-5 shadow-lg`}>
+                            <div className="bg-amber-500/10 p-4 rounded-2xl"><Zap className="w-8 h-8 text-amber-500" /></div>
+                            <div><div className={`text-4xl font-black ${textColor}`}>{stats.learning}</div><div className={`text-sm font-bold uppercase tracking-wider ${subText}`}>Learning</div></div>
+                        </div>
+                    </div>
+                    
+                    <div className={`${cardBg} p-8 rounded-[2.5rem] shadow-xl border ${theme==='dark'?'border-white/5':'border-white/50'}`}>
+                        <div className="flex items-center justify-between mb-8"><h3 className={`font-bold text-2xl ${textColor} flex items-center gap-3`}><Clock className="w-6 h-6 text-indigo-500" /> Recently Added</h3><span className={`text-xs font-bold ${subText} uppercase tracking-widest`}>Status</span></div>
+                        <div className="space-y-4">
+                        {items.slice(0, 5).map(item => (
+                            <div key={item.id} className={`group flex items-center justify-between p-5 rounded-2xl border border-transparent transition-all cursor-default ${theme==='dark'?'hover:bg-white/5 hover:border-white/10':'hover:bg-slate-50 hover:border-slate-200'}`}>
+                            <div className="flex items-center gap-5">
+                                <div className={`w-2 h-12 rounded-full ${item.type === 'synonym' ? 'bg-indigo-400' : item.type === 'antonym' ? 'bg-rose-400' : item.type === 'voca' ? 'bg-indigo-400' : 'bg-indigo-400'}`}></div>
+                                <div>
+                                <div className={`font-bold text-lg ${textColor}`}>{item.mainText}</div>
+                                <div className={`text-xs font-bold uppercase tracking-wide flex gap-2 ${subText}`}>{item.type} {item.context && <span className="text-indigo-500">• {item.context}</span>}</div>
+                                </div>
+                            </div>
+                            <div className="text-right"><div className={`text-sm font-bold ${item.nextReview < Date.now() ? 'text-rose-500' : 'text-emerald-500'}`}>{getRelativeTime(item.nextReview)}</div><div className={`text-xs font-bold ${subText}`}>Next Review</div></div>
+                            </div>
+                        ))}
+                        {items.length === 0 && (<div className={`text-center py-12 rounded-3xl border border-dashed ${theme==='dark'?'border-slate-700 text-slate-500':'border-slate-200 text-slate-400'}`}><p>Your mind palace is empty.</p><p className="text-sm mt-2">Add items or click "Load Example Data" above.</p></div>)}
+                        </div>
+                    </div>
                 </div>
             );
         };
 
-        const SynonymManager = ({ items, onAdd, onDelete }) => {
+        const VocaManager = ({ items, onAdd, onDelete, theme }) => {
+            const [formData, setFormData] = useState({ word: '', pos: 'noun', ipa: '', definition: '', example: '', collocations: '' });
+            const [isFetchingIPA, setIsFetchingIPA] = useState(false);
+            const [isFetchingExample, setIsFetchingExample] = useState(false);
+            const [isFetchingCollo, setIsFetchingCollo] = useState(false);
+
+            const handleChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); };
+            const handleSubmit = (e) => { e.preventDefault(); if (!formData.word.trim()) return; onAdd({ type: 'voca', mainText: formData.word, context: formData.definition, pos: formData.pos, ipa: formData.ipa, example: formData.example, collocations: formData.collocations, easiness: 2.5, interval: 0, nextReview: Date.now() }); setFormData({ word: '', pos: 'noun', ipa: '', definition: '', example: '', collocations: '' }); };
+            
+            // AI Handlers
+            const handleAutoData = async (fieldToUpdate) => {
+                if (!formData.word) return;
+                if (fieldToUpdate === 'ipa') setIsFetchingIPA(true);
+                if (fieldToUpdate === 'example') setIsFetchingExample(true);
+                try {
+                    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${formData.word}`);
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        const entry = data[0];
+                        if (fieldToUpdate === 'ipa') {
+                            let foundIPA = entry.phonetic;
+                            if (!foundIPA && entry.phonetics?.length > 0) foundIPA = entry.phonetics.find(p => p.text)?.text;
+                            if (foundIPA) setFormData(prev => ({ ...prev, ipa: foundIPA }));
+                            if (!formData.definition && entry.meanings?.[0]?.definitions?.[0]?.definition) {
+                                setFormData(prev => ({ ...prev, definition: entry.meanings[0].definitions[0].definition }));
+                            }
+                        }
+                        if (fieldToUpdate === 'example') {
+                            let foundExample = '';
+                            for (const meaning of entry.meanings) {
+                                for (const def of meaning.definitions) {
+                                    if (def.example) { foundExample = def.example; break; }
+                                }
+                                if (foundExample) break;
+                            }
+                            if (foundExample) setFormData(prev => ({ ...prev, example: foundExample }));
+                        }
+                    }
+                } catch (e) { console.error(e); }
+                setIsFetchingIPA(false);
+                setIsFetchingExample(false);
+            };
+
+            const handleAutoCollocations = async () => {
+                if (!formData.word) return;
+                setIsFetchingCollo(true);
+                try {
+                    const res = await fetch(`https://api.datamuse.com/words?rel_jja=${formData.word}&max=5`);
+                    let data = await res.json();
+                    if (data.length === 0) {
+                        const res2 = await fetch(`https://api.datamuse.com/words?rel_trg=${formData.word}&max=5`);
+                        data = await res2.json();
+                    }
+                    if (data.length > 0) {
+                        const words = data.map(item => item.word).join(', ');
+                        setFormData(prev => ({ ...prev, collocations: words }));
+                    }
+                } catch (e) { console.error(e); }
+                setIsFetchingCollo(false);
+            };
+
+            const vocaItems = items.filter(i => i.type === 'voca');
+            const inputClass = theme === 'dark' 
+                ? 'bg-slate-950/50 border border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-inner backdrop-blur-sm' 
+                : 'bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-sm';
+            
+            const labelClass = theme === 'dark' ? 'text-slate-400 font-bold' : 'text-slate-500 font-bold';
+
+            return (
+                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-24 pb-12 max-w-6xl mx-auto px-4">
+                    <ManagerContainer title="New Entry" subtitle="Add a new word to your collection." theme={theme}>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid md:grid-cols-3 gap-6">
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Word</label>
+                                    <div className="relative"><input name="word" value={formData.word} onChange={handleChange} placeholder="e.g. Serendipity" className={`w-full p-4 rounded-2xl outline-none font-bold transition-all pr-12 ${inputClass}`} /><Volume2 className="absolute right-4 top-4 w-5 h-5 text-indigo-500 opacity-50"/></div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Type</label>
+                                    <select name="pos" value={formData.pos} onChange={handleChange} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all appearance-none cursor-pointer ${inputClass}`}><option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option><option value="idiom">Idiom</option></select>
+                                </div>
+                            </div>
+                            
+                            {/* Row 2: IPA and Collocations */}
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>IPA (Pronunciation)</label>
+                                    <div className="relative">
+                                        <input name="ipa" value={formData.ipa} onChange={handleChange} placeholder="/.../" className={`w-full p-4 rounded-2xl outline-none font-mono text-sm transition-all pr-12 ${inputClass}`} />
+                                        <button type="button" onClick={() => handleAutoData('ipa')} disabled={isFetchingIPA} className="absolute right-2 top-2 p-2 bg-indigo-500/10 text-indigo-500 rounded-xl hover:bg-indigo-500/20 transition-colors" title="Auto-Detect IPA">
+                                            {isFetchingIPA ? <Loader2 className="w-4 h-4 animate-spin"/> : <Wand2 className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Collocations</label>
+                                    <div className="relative">
+                                        <input name="collocations" value={formData.collocations} onChange={handleChange} placeholder="strong coffee, heavy rain..." className={`w-full p-4 rounded-2xl outline-none font-medium transition-all pr-12 ${inputClass}`} />
+                                        <button type="button" onClick={handleAutoCollocations} disabled={isFetchingCollo} className="absolute right-2 top-2 p-2 bg-indigo-500/10 text-indigo-500 rounded-xl hover:bg-indigo-500/20 transition-colors" title="Find Collocations">
+                                            {isFetchingCollo ? <Loader2 className="w-4 h-4 animate-spin"/> : <Wand2 className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2"><label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Definition</label><textarea name="definition" value={formData.definition} onChange={handleChange} rows="2" placeholder="What does it mean?" className={`w-full p-4 rounded-2xl outline-none font-medium resize-none transition-all ${inputClass}`} /></div>
+                            
+                            {/* Row 4: Example Sentence */}
+                            <div className="space-y-2">
+                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Example Sentence</label>
+                                <div className="relative">
+                                    <textarea name="example" value={formData.example} onChange={handleChange} rows="2" placeholder="Use it in a sentence..." className={`w-full p-4 rounded-2xl outline-none font-medium resize-none transition-all pr-12 ${inputClass}`} />
+                                    <button type="button" onClick={() => handleAutoData('example')} disabled={isFetchingExample} className="absolute right-3 top-3 p-2 bg-indigo-500/10 text-indigo-500 rounded-xl hover:bg-indigo-500/20 transition-colors" title="Generate Example">
+                                        {isFetchingExample ? <Loader2 className="w-4 h-4 animate-spin"/> : <Wand2 className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end"><button type="submit" className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2"><Plus className="w-5 h-5" /> Add Card</button></div>
+                        </form>
+                    </ManagerContainer>
+                    <ManagerContainer title="Vocabulary" subtitle={`${vocaItems.length} items`} theme={theme}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {vocaItems.map(item => (<ItemCard key={item.id} type="voca" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-indigo-500 uppercase text-[10px] tracking-wider mr-2 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.pos}</span>{item.context || "No definition"}</span>} icon={Book} onDelete={() => onDelete(item.id)} onSpeak={() => speakText(item.mainText)} interval={item.interval} />))}
+                        </div>
+                    </ManagerContainer>
+                </div>
+            );
+        };
+
+        const SynonymManager = ({ items, onAdd, onDelete, theme }) => {
             const [word, setWord] = useState('');
             const [synonyms, setSynonyms] = useState('');
-            
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (!word.trim()) return;
-                const synList = synonyms.split(',').map(s => s.trim()).filter(s => s);
-                onAdd({
-                type: 'synonym',
-                mainText: word,
-                related: synList,
-                easiness: 2.5,
-                interval: 0,
-                nextReview: Date.now()
-                });
-                setWord('');
-                setSynonyms('');
-            };
-
+            const handleSubmit = (e) => { e.preventDefault(); if (!word.trim()) return; const synList = synonyms.split(',').map(s => s.trim()).filter(s => s); onAdd({ type: 'synonym', mainText: word, related: synList, easiness: 2.5, interval: 0, nextReview: Date.now() }); setWord(''); setSynonyms(''); };
             const synonymItems = items.filter(i => i.type === 'synonym');
+            
+            const inputClass = theme === 'dark' 
+                ? 'bg-slate-950/50 border border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-inner backdrop-blur-sm' 
+                : 'bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-sm';
+            
+            const labelClass = theme === 'dark' ? 'text-slate-400 font-bold' : 'text-slate-500 font-bold';
+
+            // Synonym Card Component
+            const SynonymCard = ({ item }) => (
+                <div className={`${theme==='dark'?'bg-slate-900/50 border-slate-700':'bg-white border-slate-100'} rounded-3xl p-5 shadow-sm border hover:shadow-md transition-all duration-300 relative group overflow-hidden`}>
+                    <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-violet-400 via-indigo-500 to-violet-400"></div>
+                    <div className="flex items-center justify-between gap-3 mt-3 mb-2">
+                        <div className="flex-1 text-center min-w-0"><div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Concept</div><h4 className={`text-xl font-black truncate ${theme==='dark'?'text-white':'text-slate-800'}`}>{item.mainText}</h4></div>
+                        <div className="shrink-0 flex flex-col items-center pt-4"><div className={`w-8 h-8 rounded-full border flex items-center justify-center shadow-inner ${theme==='dark'?'bg-slate-800 border-slate-600 text-indigo-400':'bg-indigo-50 border-indigo-100 text-indigo-600'}`}><LinkIcon className="w-3.5 h-3.5" /></div></div>
+                        <div className="flex-1 text-center min-w-0"><div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Synonyms</div><div className={`text-xl font-black truncate ${theme==='dark'?'text-slate-300':'text-slate-800'}`}>{item.related?.[0] || '...'}{item.related?.length > 1 && <span className="text-indigo-500 text-xs ml-1 align-top">+{item.related.length - 1}</span>}</div></div>
+                    </div>
+                    <div className={`flex justify-end mt-2 pt-2 border-t ${theme==='dark'?'border-slate-800':'border-slate-50'}`}><button onClick={() => onDelete(item.id)} className="text-slate-400 hover:text-indigo-500 transition-colors p-1.5"><Trash2 className="w-4 h-4" /></button></div>
+                </div>
+            );
 
             return (
-                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                <div className="bg-indigo-50 border border-indigo-100 p-8 rounded-3xl">
-                    <h3 className="text-indigo-900 text-xl font-bold mb-2 flex items-center gap-2">
-                    <LinkIcon className="w-6 h-6" /> Synonym Chain
-                    </h3>
-                    <p className="text-indigo-600/80 text-sm mb-6 max-w-2xl">
-                    Build a web of meaning. Connect a core concept to its various shades of meaning.
-                    </p>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <div className="relative">
-                            <label className="text-xs font-bold text-indigo-400 uppercase ml-3 mb-1 block">Main Concept</label>
-                            <input
-                            type="text"
-                            placeholder="e.g. Happy"
-                            className="w-full p-4 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all font-semibold text-indigo-900 placeholder:text-indigo-300"
-                            value={word}
-                            onChange={e => setWord(e.target.value)}
-                            />
-                        </div>
-                        <div className="relative">
-                            <label className="text-xs font-bold text-indigo-400 uppercase ml-3 mb-1 block">Variations</label>
-                            <input
-                            type="text"
-                            placeholder="e.g. Joyful, Ecstatic, Content"
-                            className="w-full p-4 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all font-semibold text-indigo-900 placeholder:text-indigo-300"
-                            value={synonyms}
-                            onChange={e => setSynonyms(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <button type="submit" className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 w-full md:w-auto shadow-lg hover:shadow-indigo-500/30 transition-all">
-                        Link Words
-                    </button>
-                    </form>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {synonymItems.map(item => (
-                    <div key={item.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition-all relative group">
-                        <button 
-                            onClick={() => onDelete(item.id)}
-                            className="absolute top-4 right-4 text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                        <div className="font-black text-2xl text-slate-800 mb-4">{item.mainText}</div>
-                        
-                        <div className="flex flex-wrap gap-2">
-                        <div className="w-8 h-8 flex items-center justify-center">
-                            <div className="w-full h-0.5 bg-slate-200"></div>
-                        </div>
-                        
-                        {item.related?.map((s, idx) => (
-                            <span key={idx} className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium border border-emerald-100 flex items-center gap-1.5 shadow-sm">
-                            {s}
-                            </span>
-                        ))}
-                        </div>
-                    </div>
-                    ))}
-                </div>
+                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-24 pb-12 max-w-6xl mx-auto px-4">
+                    <ManagerContainer title="New Chain" subtitle="Link concepts together." theme={theme}>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div className="space-y-2"><label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Main Word</label><input value={word} onChange={e => setWord(e.target.value)} placeholder="e.g. Happy" className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} /></div>
+                                <div className="space-y-2"><label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Synonyms</label><input value={synonyms} onChange={e => setSynonyms(e.target.value)} placeholder="Joyful, Ecstatic..." className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} /></div>
+                            </div>
+                            <div className="flex justify-end"><button type="submit" className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 flex items-center gap-2"><LinkIcon className="w-5 h-5" /> Connect</button></div>
+                        </form>
+                    </ManagerContainer>
+                    <ManagerContainer title="Synonyms" subtitle={`${synonymItems.length} chains`} theme={theme}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{synonymItems.map(item => (<SynonymCard key={item.id} item={item} />))}</div>
+                    </ManagerContainer>
                 </div>
             );
         };
 
-        const AntonymManager = ({ items, onAdd, onDelete }) => {
+        const AntonymManager = ({ items, onAdd, onDelete, theme }) => {
             const [wordA, setWordA] = useState('');
             const [wordB, setWordB] = useState('');
-            
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (!wordA.trim() || !wordB.trim()) return;
-                onAdd({
-                type: 'antonym',
-                mainText: wordA,
-                related: [wordB],
-                easiness: 2.5,
-                interval: 0,
-                nextReview: Date.now()
-                });
-                setWordA('');
-                setWordB('');
-            };
-
+            const handleSubmit = (e) => { e.preventDefault(); if (!wordA.trim() || !wordB.trim()) return; onAdd({ type: 'antonym', mainText: wordA, related: [wordB], easiness: 2.5, interval: 0, nextReview: Date.now() }); setWordA(''); setWordB(''); };
             const antonymItems = items.filter(i => i.type === 'antonym');
+            
+            const inputClass = theme === 'dark' 
+                ? 'bg-slate-950/50 border border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-inner backdrop-blur-sm' 
+                : 'bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-sm';
+            
+            const labelClass = theme === 'dark' ? 'text-slate-400 font-bold' : 'text-slate-500 font-bold';
+
+            const AntonymCard = ({ item }) => (
+                <div className={`${theme==='dark'?'bg-slate-900/50 border-slate-700':'bg-white border-slate-100'} rounded-3xl p-6 shadow-sm border hover:shadow-md transition-all duration-300 relative group overflow-hidden`}>
+                    <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-rose-400 via-pink-500 to-rose-400"></div>
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                        <div className="flex-1 text-center min-w-0"><div className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">Positive</div><h4 className={`text-xl font-black truncate ${theme==='dark'?'text-white':'text-slate-800'}`}>{item.mainText}</h4></div>
+                        <div className="shrink-0 flex flex-col items-center"><div className={`w-10 h-10 rounded-full border flex items-center justify-center text-xs font-black shadow-inner ${theme==='dark'?'bg-slate-800 border-slate-600 text-rose-400':'bg-rose-50 border-rose-100 text-rose-600'}`}>VS</div></div>
+                        <div className="flex-1 text-center min-w-0"><div className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">Negative</div><h4 className={`text-xl font-black truncate ${theme==='dark'?'text-white':'text-slate-800'}`}>{item.related?.[0] || '?'}</h4></div>
+                    </div>
+                    <div className={`flex justify-end items-end mt-6 pt-4 border-t ${theme==='dark'?'border-slate-800':'border-slate-50'}`}><button onClick={() => onDelete(item.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button></div>
+                </div>
+            );
 
             return (
-                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                <div className="bg-rose-50 border border-rose-100 p-8 rounded-3xl">
-                    <h3 className="text-rose-900 text-xl font-bold mb-2 flex items-center gap-2">
-                    <ArrowLeftRight className="w-6 h-6" /> Polarity Engine
-                    </h3>
-                    <p className="text-rose-600/80 text-sm mb-6">
-                    Define the spectrum. Master the extremes.
-                    </p>
-                    <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 items-end">
-                    <div className="flex-1 w-full">
-                        <label className="text-xs font-bold text-rose-400 uppercase ml-3 mb-1 block">Positive / Side A</label>
-                        <input
-                        type="text"
-                        placeholder="e.g. Expand"
-                        className="w-full p-4 rounded-xl border border-rose-200 bg-white focus:outline-none focus:ring-4 focus:ring-rose-500/20 transition-all font-semibold text-rose-900 placeholder:text-rose-300"
-                        value={wordA}
-                        onChange={e => setWordA(e.target.value)}
-                        />
-                    </div>
-                    
-                    <div className="text-rose-300 font-black text-2xl pb-3 px-2">VS</div>
-                    
-                    <div className="flex-1 w-full">
-                        <label className="text-xs font-bold text-rose-400 uppercase ml-3 mb-1 block">Negative / Side B</label>
-                        <input
-                        type="text"
-                        placeholder="e.g. Contract"
-                        className="w-full p-4 rounded-xl border border-rose-200 bg-white focus:outline-none focus:ring-4 focus:ring-rose-500/20 transition-all font-semibold text-rose-900 placeholder:text-rose-300"
-                        value={wordB}
-                        onChange={e => setWordB(e.target.value)}
-                        />
-                    </div>
-                    
-                    <button type="submit" className="bg-rose-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-rose-700 w-full md:w-auto shadow-lg hover:shadow-rose-500/30 transition-all">
-                        Create Pair
-                    </button>
-                    </form>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {antonymItems.map(item => (
-                    <div key={item.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden relative group shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                        <button 
-                            onClick={() => onDelete(item.id)}
-                            className="absolute top-2 right-2 z-10 text-slate-300 hover:text-red-500 bg-white/50 hover:bg-red-50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                        <div className="h-40 flex flex-col">
-                        <div className="flex-1 bg-white flex items-center justify-center font-black text-slate-800 text-xl">
-                            {item.mainText}
-                        </div>
-                        <div className="h-0.5 bg-slate-100 w-full relative">
-                            <div className="absolute left-1/2 -top-3 -translate-x-1/2 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded text-rose-600 text-[10px] font-black tracking-widest">VS</div>
-                        </div>
-                        <div className="flex-1 bg-slate-50/50 flex items-center justify-center font-bold text-slate-500 text-xl">
-                            {item.related && item.related[0]}
-                        </div>
-                        </div>
-                    </div>
-                    ))}
-                </div>
+                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-24 pb-12 max-w-6xl mx-auto px-4">
+                    <ManagerContainer title="New Contrast" subtitle="Define opposites & master the spectrum." theme={theme}>
+                        <form onSubmit={handleSubmit} className="space-y-8">
+                            <div className="flex flex-col md:flex-row items-center gap-4 relative">
+                                <div className="space-y-2 flex-1 w-full"><input value={wordA} onChange={e => setWordA(e.target.value)} placeholder="e.g. Expand" className={`w-full p-5 rounded-2xl outline-none font-bold text-lg transition-all ${inputClass}`} /></div>
+                                <div className="hidden md:flex shrink-0 justify-center"><div className={`font-black text-xl italic w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${theme==='dark'?'bg-slate-700 text-slate-400':'bg-white text-slate-200'}`}>vs</div></div>
+                                <div className="space-y-2 flex-1 w-full"><input value={wordB} onChange={e => setWordB(e.target.value)} placeholder="e.g. Contract" className={`w-full p-5 rounded-2xl outline-none font-bold text-lg transition-all ${inputClass}`} /></div>
+                            </div>
+                            <div className="flex justify-end"><button type="submit" className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 flex items-center gap-2"><ArrowLeftRight className="w-5 h-5" /> Create Pair</button></div>
+                        </form>
+                    </ManagerContainer>
+                    <ManagerContainer title="Antonyms" subtitle={`${antonymItems.length} pairs`} theme={theme}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{antonymItems.map(item => (<AntonymCard key={item.id} item={item} />))}</div>
+                    </ManagerContainer>
                 </div>
             );
         };
 
-        const PhraseManager = ({ items, onAdd, onDelete }) => {
+        const PhraseManager = ({ items, onAdd, onDelete, theme }) => {
             const [phrase, setPhrase] = useState('');
             const [context, setContext] = useState('');
-            
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (!phrase.trim()) return;
-                onAdd({
-                type: 'phrase',
-                mainText: phrase,
-                context: context, 
-                easiness: 2.5,
-                interval: 0,
-                nextReview: Date.now()
-                });
-                setPhrase('');
-                setContext('');
-            };
-
+            const handleSubmit = (e) => { e.preventDefault(); if (!phrase.trim()) return; onAdd({ type: 'phrase', mainText: phrase, context: context, easiness: 2.5, interval: 0, nextReview: Date.now() }); setPhrase(''); setContext(''); };
             const phraseItems = items.filter(i => i.type === 'phrase');
+            
+            const inputClass = theme === 'dark' 
+                ? 'bg-slate-950/50 border border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-inner backdrop-blur-sm' 
+                : 'bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-sm';
+            
+            const labelClass = theme === 'dark' ? 'text-slate-400 font-bold' : 'text-slate-500 font-bold';
 
             return (
-                <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                <div className="bg-amber-50 border border-amber-100 p-8 rounded-3xl">
-                    <h3 className="text-amber-900 text-xl font-bold mb-2 flex items-center gap-2">
-                    <MessageCircle className="w-6 h-6" /> Situational Context
-                    </h3>
-                    <p className="text-amber-700 text-sm mb-6">
-                    Fluency isn't just knowing the words. It's knowing when to use them.
-                    </p>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="relative">
-                        <label className="text-xs font-bold text-amber-500 uppercase ml-3 mb-1 block">The Phrase</label>
-                        <input
-                        type="text"
-                        placeholder="e.g. I was wondering if you could help me..."
-                        className="w-full p-4 rounded-xl border border-amber-200 bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all font-medium text-amber-900 placeholder:text-amber-300"
-                        value={phrase}
-                        onChange={e => setPhrase(e.target.value)}
-                        />
-                    </div>
-                    
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                        <label className="text-xs font-bold text-amber-500 uppercase ml-3 mb-1 block">Context / Situation</label>
-                        <input
-                            type="text"
-                            placeholder="e.g. Polite Request to Boss"
-                            className="w-full p-4 rounded-xl border border-amber-200 bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all font-medium text-amber-900 placeholder:text-amber-300"
-                            value={context}
-                            onChange={e => setContext(e.target.value)}
-                        />
-                        </div>
-                        <button type="submit" className="bg-amber-500 text-white px-8 rounded-xl font-bold hover:bg-amber-600 mt-6 shadow-lg hover:shadow-amber-500/30 transition-all">
-                        Save
-                        </button>
-                    </div>
-                    </form>
-                </div>
-
-                <div className="space-y-4">
-                    {phraseItems.map(item => (
-                    <div key={item.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex justify-between items-center group relative overflow-hidden">
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
-                        <div className="pl-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[10px] font-black tracking-wider text-amber-600 bg-amber-50 px-2 py-1 rounded-md uppercase">
-                            {item.context || 'General'}
-                            </span>
-                        </div>
-                        <div className="text-xl text-slate-800 font-medium leading-relaxed">"{item.mainText}"</div>
-                        </div>
-                        <button 
-                            onClick={() => onDelete(item.id)}
-                            className="text-slate-300 hover:text-red-500 hover:bg-slate-50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                            <Trash2 className="w-5 h-5" />
-                        </button>
-                    </div>
-                    ))}
-                </div>
+                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-24 pb-12 max-w-6xl mx-auto px-4">
+                    <ManagerContainer title="New Phrase" subtitle="Capture situational language." theme={theme}>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="space-y-2"><label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>The Phrase</label><input value={phrase} onChange={e => setPhrase(e.target.value)} placeholder="e.g. Break a leg" className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} /></div>
+                            <div className="space-y-2"><label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Context</label><input value={context} onChange={e => setContext(e.target.value)} placeholder="e.g. Wishing luck" className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} /></div>
+                            <div className="flex justify-end"><button type="submit" className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 flex items-center gap-2"><MessageCircle className="w-5 h-5" /> Save Phrase</button></div>
+                        </form>
+                    </ManagerContainer>
+                    <ManagerContainer title="Phrases" subtitle={`${phraseItems.length} items`} theme={theme}>
+                        <div className="grid grid-cols-1 gap-5">{phraseItems.map(item => (<ItemCard key={item.id} type="phrase" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>} icon={MessageCircle} onDelete={() => onDelete(item.id)} onSpeak={() => speakText(item.mainText)} interval={item.interval} />))}</div>
+                    </ManagerContainer>
                 </div>
             );
         };
 
-        const ReviewSession = ({ dueItems, onComplete, onClose }) => {
+        const ReviewSession = ({ dueItems, onClose, onComplete, mode = 'srs', theme }) => {
+            const [localIndex, setLocalIndex] = useState(0);
             const [isFlipped, setIsFlipped] = useState(false);
+            
+            const currentItem = mode === 'srs' ? dueItems[0] : dueItems[localIndex];
             const totalDue = dueItems.length;
-            const currentItem = dueItems[0]; 
 
-            if (!currentItem) {
+            if (!currentItem && mode === 'srs') {
                 return (
-                <div className="fixed inset-0 bg-slate-900/90 z-[100] flex items-center justify-center backdrop-blur-md p-4">
-                    <div className="bg-white p-10 rounded-3xl max-w-md w-full text-center animate-in zoom-in-95 shadow-2xl">
-                    <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Check className="w-12 h-12 text-green-600" />
-                    </div>
-                    <h2 className="text-3xl font-black text-slate-800 mb-2">Session Complete!</h2>
-                    <p className="text-slate-500 mb-8 text-lg">You've strengthened your neural pathways.</p>
-                    <button onClick={onClose} className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-800 w-full transition-transform active:scale-95">
-                        Return to Dashboard
-                    </button>
+                <div className="fixed inset-0 bg-slate-900/90 z-[200] flex items-center justify-center backdrop-blur-md p-4">
+                    <div className={`${theme === 'dark' ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-800'} p-10 rounded-3xl max-w-md w-full text-center animate-in zoom-in-95 shadow-2xl border`}>
+                    <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6"><Check className="w-12 h-12 text-green-600" /></div>
+                    <h2 className="text-3xl font-black mb-2">You are done with the revision!</h2>
+                    <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-slate-500'} mb-8 text-lg`}>Great job keeping your vocabulary fresh.</p>
+                    <button onClick={onClose} className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-800 w-full transition-transform active:scale-95">Return to Dashboard</button>
                     </div>
                 </div>
                 );
             }
 
-            const handleRate = (rating) => {
-                const { interval, easiness } = calculateNextReview(
-                rating, 
-                currentItem.interval || 0, 
-                currentItem.easiness || 2.5
+            if (mode === 'flashcard' && localIndex >= totalDue) {
+                return (
+                <div className="fixed inset-0 bg-slate-900/90 z-[200] flex items-center justify-center backdrop-blur-md p-4">
+                    <div className={`${theme === 'dark' ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-800'} p-10 rounded-3xl max-w-md w-full text-center animate-in zoom-in-95 shadow-2xl border`}>
+                    <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6"><Check className="w-12 h-12 text-indigo-600" /></div>
+                    <h2 className="text-3xl font-black mb-2">You are done!</h2>
+                    <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-slate-500'} mb-8 text-lg`}>Great job reviewing.</p>
+                    <button onClick={onClose} className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-800 w-full transition-transform active:scale-95">Finish</button>
+                    </div>
+                </div>
                 );
+            }
 
+            const handleSRSRate = (rating) => {
+                const { interval, easiness } = calculateNextReview(rating, currentItem.interval || 0, currentItem.easiness || 2.5);
                 const nextReviewDate = Date.now() + (interval * 24 * 60 * 60 * 1000);
-
-                onComplete(currentItem.id, {
-                interval,
-                easiness,
-                nextReview: nextReviewDate
-                });
-
+                onComplete(currentItem.id, { interval, easiness, nextReview: nextReviewDate });
                 setIsFlipped(false);
             };
 
+            const handleFlashcardNext = () => { setLocalIndex(prev => prev + 1); setIsFlipped(false); };
+            const handleBack = () => { if (localIndex > 0) { setLocalIndex(prev => prev - 1); setIsFlipped(false); } };
+
+            const cardBg = theme === 'dark' ? 'bg-slate-800' : 'bg-white';
+            const textColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+
             return (
-                <div className="fixed inset-0 bg-slate-900/95 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 bg-slate-900/95 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
                 <div className="w-full max-w-2xl flex flex-col h-[70vh]">
-                    
-                    {/* Header */}
                     <div className="flex justify-between items-center text-white mb-4 px-2">
-                        <span className="font-bold opacity-70">{totalDue} Cards Remaining</span>
+                        <div className="flex items-center gap-4">
+                            {mode === 'flashcard' && localIndex > 0 && (
+                                <button onClick={handleBack} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ArrowLeft className="w-6 h-6" /></button>
+                            )}
+                            <span className="font-bold opacity-70">{mode === 'srs' ? `${totalDue} Cards Remaining` : `Card ${localIndex + 1} / ${totalDue}`}</span>
+                        </div>
                         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                     </div>
-
-                    {/* Card */}
-                    <div className="flex-1 bg-white rounded-3xl shadow-2xl relative overflow-hidden flex flex-col">
-                        
-                        {/* Front of Card Content */}
+                    <div className={`flex-1 ${cardBg} rounded-3xl shadow-2xl relative overflow-hidden flex flex-col transition-colors duration-300`}>
                         <div className="flex-1 flex flex-col items-center justify-center text-center p-8 md:p-12">
-                        <span className="inline-block px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-bold tracking-widest uppercase mb-6">
-                            {currentItem.type}
-                        </span>
-                        
-                        <h2 className="text-4xl md:text-5xl font-black text-slate-800 mb-6 leading-tight">
-                            {currentItem.mainText}
-                        </h2>
-
-                        {currentItem.type === 'phrase' && (
-                            <div className="bg-amber-50 text-amber-700 px-4 py-2 rounded-lg font-medium text-sm border border-amber-100 flex items-center gap-2">
-                                <MessageCircle className="w-4 h-4" /> Context: {currentItem.context}
-                            </div>
-                        )}
+                        <span className="inline-block px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-bold tracking-widest uppercase mb-6">{currentItem.type}</span>
+                        <h2 className={`text-4xl md:text-5xl font-black mb-6 leading-tight ${textColor}`}>{currentItem.mainText}</h2>
+                        {currentItem.type === 'phrase' && <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-medium text-sm border border-indigo-100 flex items-center gap-2"><MessageCircle className="w-4 h-4" /> Context: {currentItem.context}</div>}
                         </div>
-
-                        {/* Answer Section (Conditional Render) */}
                         {isFlipped && (
-                        <div className="bg-slate-50 border-t border-slate-100 p-8 animate-in slide-in-from-bottom-10 fade-in duration-300 absolute inset-0 flex flex-col items-center justify-center z-10">
+                        <div className={`${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'} border-t p-8 animate-in slide-in-from-bottom-10 fade-in duration-300 absolute inset-0 flex flex-col items-center justify-center z-10`}>
                             <div className="text-center">
                                     <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">The Answer Is</div>
-                                    {currentItem.type === 'synonym' && (
-                                        <div className="text-3xl font-bold text-indigo-600 leading-relaxed">{currentItem.related?.join(', ')}</div>
-                                    )}
-                                    {currentItem.type === 'antonym' && (
-                                        <div className="text-4xl font-bold text-rose-600">{currentItem.related?.[0]}</div>
-                                    )}
-                                    {currentItem.type === 'phrase' && (
-                                        <div className="text-xl text-amber-700 italic font-medium max-w-lg">
-                                            "Repeat this phrase out loud with proper emotion. Visualize the {currentItem.context} situation."
+                                    {currentItem.type === 'voca' && (
+                                        <div className="space-y-4">
+                                            <div className={`text-2xl font-medium leading-relaxed ${theme==='dark'?'text-indigo-300':'text-indigo-700'}`}>{currentItem.context}</div>
+                                            {currentItem.ipa && <div className="text-sm font-mono text-slate-400">{currentItem.ipa}</div>}
+                                            {currentItem.example && <div className="text-slate-500 italic">"{currentItem.example}"</div>}
                                         </div>
                                     )}
+                                    {currentItem.type === 'synonym' && <div className="text-3xl font-bold text-indigo-600 leading-relaxed">{currentItem.related?.join(', ')}</div>}
+                                    {currentItem.type === 'antonym' && <div className="text-4xl font-bold text-rose-600">{currentItem.related?.[0]}</div>}
+                                    {currentItem.type === 'phrase' && <div className="text-xl text-indigo-700 italic font-medium max-w-lg">"Repeat this phrase out loud with proper emotion. Visualize the {currentItem.context} situation."</div>}
                             </div>
                         </div>
                         )}
-
-                        {/* Controls */}
-                        <div className="p-6 bg-white border-t border-slate-100 z-20">
+                        <div className={`p-6 ${cardBg} border-t ${theme==='dark'?'border-slate-700':'border-slate-100'} z-20`}>
                         {!isFlipped ? (
-                            <button 
-                            onClick={() => setIsFlipped(true)}
-                            className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95"
-                            >
-                            Reveal Answer
-                            </button>
+                            <button onClick={() => setIsFlipped(true)} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95">Reveal Answer</button>
                         ) : (
-                            <div className="grid grid-cols-3 gap-4">
-                            <button onClick={() => handleRate(1)} className="group bg-rose-50 text-rose-700 py-4 rounded-2xl font-bold border border-rose-100 hover:bg-rose-100 hover:border-rose-200 transition-all active:scale-95">
-                                <span className="block text-xs opacity-50 uppercase mb-1 group-hover:opacity-100">Reset</span>
-                                Forgot
-                            </button>
-                            <button onClick={() => handleRate(3)} className="group bg-amber-50 text-amber-700 py-4 rounded-2xl font-bold border border-amber-100 hover:bg-amber-100 hover:border-amber-200 transition-all active:scale-95">
-                                <span className="block text-xs opacity-50 uppercase mb-1 group-hover:opacity-100">Soon</span>
-                                Hard
-                            </button>
-                            <button onClick={() => handleRate(5)} className="group bg-emerald-50 text-emerald-700 py-4 rounded-2xl font-bold border border-emerald-100 hover:bg-emerald-100 hover:border-emerald-200 transition-all active:scale-95">
-                                <span className="block text-xs opacity-50 uppercase mb-1 group-hover:opacity-100">4 Days</span>
-                                Easy
-                            </button>
+                            <div className="w-full">
+                                {mode === 'srs' ? (
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <button onClick={() => handleSRSRate(1)} className="group bg-rose-50 text-rose-700 py-4 rounded-2xl font-bold border border-rose-100 hover:bg-rose-100 hover:border-rose-200 transition-all active:scale-95"><span className="block text-xs opacity-50 uppercase mb-1 group-hover:opacity-100">Reset</span>Forgot</button>
+                                        <button onClick={() => handleSRSRate(3)} className="group bg-amber-50 text-amber-700 py-4 rounded-2xl font-bold border border-amber-100 hover:bg-amber-100 hover:border-amber-200 transition-all active:scale-95"><span className="block text-xs opacity-50 uppercase mb-1 group-hover:opacity-100">Soon</span>Hard</button>
+                                        <button onClick={() => handleSRSRate(5)} className="group bg-emerald-50 text-emerald-700 py-4 rounded-2xl font-bold border border-emerald-100 hover:bg-emerald-100 hover:border-emerald-200 transition-all active:scale-95"><span className="block text-xs opacity-50 uppercase mb-1 group-hover:opacity-100">4 Days</span>Easy</button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <button onClick={handleBack} disabled={localIndex === 0} className={`bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold border border-slate-200 hover:bg-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2 ${localIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}><ArrowLeft className="w-5 h-5" /> Back</button>
+                                        <button onClick={handleFlashcardNext} className="bg-indigo-600 text-white py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-2">Next <Play className="w-5 h-5" /></button>
+                                    </div>
+                                )}
                             </div>
                         )}
                         </div>
                     </div>
-
                 </div>
                 </div>
             );
@@ -730,21 +1013,25 @@
             const [user, setUser] = useState(null);
             const [items, setItems] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [activeTab, setActiveTab] = useState('home');
-            const [isReviewing, setIsReviewing] = useState(false);
+            const [activeTab, setActiveTab] = useState('landing');
             const [authError, setAuthError] = useState(null);
             const [isAdding, setIsAdding] = useState(false);
+            const [streak, setStreak] = useState(1);
+            
+            const [reviewQueue, setReviewQueue] = useState(null);
+            const [reviewMode, setReviewMode] = useState('srs'); 
+            const [theme, setTheme] = useState('light');
+            const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
-            // 1. Listen for Auth State
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     setUser(u);
                     setLoading(false);
+                    if(u) checkStreak(u);
                 });
                 return () => unsubscribe();
             }, []);
 
-            // 2. Sync Data from Cloud
             useEffect(() => {
                 if (!user) return;
                 const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'));
@@ -755,15 +1042,30 @@
                 return () => unsubscribe();
             }, [user]);
 
-            // 3. Cloud Actions
-            const handleAdd = async (data) => {
-                // AUTO-SAVE: This sends data directly to Firebase
-                if(user) await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), data);
+            const checkStreak = async (currentUser) => {
+                try {
+                    const statsRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'metadata', 'stats');
+                    const statsSnap = await getDoc(statsRef);
+                    const today = new Date().toDateString();
+                    let newStreak = 1;
+                    if (statsSnap.exists()) {
+                        const data = statsSnap.data();
+                        const lastLoginDate = new Date(data.lastLogin);
+                        const yesterday = new Date();
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        if (data.lastLogin === today) { newStreak = data.currentStreak; } 
+                        else if (lastLoginDate.toDateString() === yesterday.toDateString()) { newStreak = data.currentStreak + 1; } 
+                        else { newStreak = 1; }
+                    }
+                    await setDoc(statsRef, { lastLogin: today, currentStreak: newStreak }, { merge: true });
+                    setStreak(newStreak);
+                } catch (e) { console.error("Streak Error:", e); }
             };
-            const handleDelete = async (id) => {
-                if(user) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id));
-            };
+
+            const handleAdd = async (data) => { if(user) await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), data); };
+            const handleDelete = async (id) => { if(user) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id)); };
             const handleUpdateSRS = async (id, data) => {
+                setReviewQueue(prevQueue => { if (!prevQueue) return null; return prevQueue.filter(item => item.id !== id); });
                 if(user) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id), data);
             };
 
@@ -773,70 +1075,70 @@
                     return;
                 }
                 const provider = new GoogleAuthProvider();
-                try {
-                    await signInWithPopup(auth, provider);
-                } catch (err) {
-                    setAuthError(err.message);
-                }
+                try { await signInWithPopup(auth, provider); } catch (err) { setAuthError(err.message); }
             };
 
-            const handleLogout = async () => {
-                await signOut(auth);
-                window.location.reload();
-            };
+            const handleLogout = async () => { await signOut(auth); window.location.reload(); };
 
-            // Demo Data Loader
             const handleLoadDemo = async () => {
                 if (!user) return;
                 setIsAdding(true);
-                
                 const demoItems = [
                     { type: 'synonym', mainText: 'Happy', related: ['Joyful', 'Ecstatic', 'Content', 'Elated'], easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 },
                     { type: 'antonym', mainText: 'Artificial', related: ['Natural'], easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 },
                     { type: 'phrase', mainText: 'Could you do me a favor?', context: 'Polite Request', easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 },
                     { type: 'phrase', mainText: 'It slipped my mind completely.', context: 'Apologizing for forgetting', easiness: 2.5, interval: 0, nextReview: Date.now() - 10000 }
                 ];
-
-                for (const item of demoItems) {
-                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), item);
-                }
+                for (const item of demoItems) { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), item); }
                 setIsAdding(false);
             };
 
-            if (loading) return <div className="h-screen flex items-center justify-center text-indigo-400">Loading...</div>;
-            
-            // SHOW LOGIN PAGE IF NO USER
-            if (!user) return <LoginPage onLogin={handleLogin} error={authError} />;
-
-            // SHOW DASHBOARD IF LOGGED IN
             const dueItems = items.filter(i => i.nextReview < Date.now());
 
+            const startDueReview = (category = 'all') => {
+                let queue = dueItems;
+                if (category !== 'all') { queue = dueItems.filter(i => i.type === category); }
+                if (queue.length === 0) { alert("No due items in this category!"); return; }
+                setReviewMode('srs');
+                setReviewQueue(queue);
+            };
+
+            const startFlashcardSession = (type) => {
+                const filtered = items.filter(i => i.type === type);
+                if (filtered.length === 0) { alert(`No ${type}s found! Add some first.`); return; }
+                const shuffled = [...filtered].sort(() => 0.5 - Math.random()).slice(0, 20); // Create copy before sort
+                setReviewMode('flashcard');
+                setReviewQueue(shuffled);
+            };
+
+            if (loading) return <div className="h-screen flex items-center justify-center text-indigo-400 bg-slate-900">Loading...</div>;
+            if (!user) return (
+                <>
+                    <div className="fixed inset-0 z-[-1] bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-300 via-purple-300 to-orange-200"></div>
+                    <LoginPage onLogin={handleLogin} error={authError} />
+                </>
+            );
+
+            // Dynamic Background based on Theme
+            const bgGradient = theme === 'dark' 
+                ? 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-indigo-950 to-slate-900' 
+                : 'bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-300 via-purple-300 to-orange-200';
+
             return (
-                <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 selection:bg-indigo-100 selection:text-indigo-900">
-                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} />
-
-                    <main className="max-w-6xl mx-auto p-4 md:p-8 mt-4">
-                        {activeTab === 'home' && (
-                            <Dashboard 
-                                items={items} 
-                                dueCount={dueItems.length} 
-                                onReview={() => setIsReviewing(true)} 
-                                onLoadDemo={handleLoadDemo}
-                                isAdding={isAdding}
-                            />
-                        )}
-                        {activeTab === 'synonyms' && (
-                            <SynonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
-                        )}
-                        {activeTab === 'antonyms' && (
-                            <AntonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
-                        )}
-                        {activeTab === 'phrases' && (
-                            <PhraseManager items={items} onAdd={handleAdd} onDelete={handleDelete} />
-                        )}
+                <div className={`min-h-screen pb-20 selection:bg-indigo-500 selection:text-white relative transition-colors duration-500 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>
+                    <div className={`fixed inset-0 z-[-1] ${bgGradient} transition-colors duration-700`}></div>
+                    
+                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} />
+                    
+                    <main>
+                        {activeTab === 'landing' && ( <LandingPage setActiveTab={setActiveTab} theme={theme} /> )}
+                        {activeTab === 'dashboard' && ( <Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} /> )}
+                        {activeTab === 'voca' && ( <VocaManager items={items} onAdd={handleAdd} onDelete={handleDelete} theme={theme} /> )}
+                        {activeTab === 'synonyms' && ( <SynonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} theme={theme} /> )}
+                        {activeTab === 'antonyms' && ( <AntonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} theme={theme} /> )}
+                        {activeTab === 'phrases' && ( <PhraseManager items={items} onAdd={handleAdd} onDelete={handleDelete} theme={theme} /> )}
                     </main>
-
-                    {isReviewing && <ReviewSession dueItems={dueItems} onClose={() => setIsReviewing(false)} onComplete={handleUpdateSRS} />}
+                    {reviewQueue && ( <ReviewSession dueItems={reviewQueue} mode={reviewMode} onClose={() => setReviewQueue(null)} onComplete={handleUpdateSRS} theme={theme} /> )}
                 </div>
             );
         };
