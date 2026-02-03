@@ -417,7 +417,7 @@
             </div>
         );
 
-        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme }) => {
+        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages }) => {
             const navItems = [
                 { id: 'dashboard', label: 'Dashboard', icon: Grid },
                 { id: 'voca', label: 'Vocab', icon: Book }, // Changed from "Voca" to "Vocab"
@@ -493,15 +493,52 @@
                             </div>
                         </div>
                     </div>
-                    {/* Floating Theme Toggle Beneath Nav */}
-                    <div className="fixed top-24 right-4 md:right-8 z-40 animate-slide-up delay-500">
-                        <button 
-                            onClick={toggleTheme} 
-                            className={`p-2.5 rounded-full transition-all duration-300 shadow-xl border backdrop-blur-md ${theme === 'dark' ? 'bg-[#0f172a]/80 border-white/10 text-yellow-400 hover:bg-[#1e293b] hover:border-yellow-400/50 hover:shadow-yellow-400/20' : 'bg-white/80 border-white text-indigo-600 hover:bg-white'}`}
-                            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                        >
-                            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                        </button>
+                    {/* Floating Icons Beneath Nav - Aligned with Logo and User */}
+                    <div className="fixed top-24 left-0 right-0 z-40 px-4 md:px-8">
+                        <div className="max-w-6xl mx-auto flex justify-between items-center px-6">
+                            {/* Messenger Button - Beneath Logo */}
+                            <div className="animate-slide-up delay-300">
+                                <button 
+                                    onClick={() => setIsMessengerOpen(true)}
+                                    className={`relative p-2.5 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 group ${
+                                        theme === 'dark' 
+                                            ? 'bg-gradient-to-br from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500' 
+                                            : 'bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400'
+                                    }`}
+                                    title="Open Messages"
+                                >
+                                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-transform group-hover:scale-110">
+                                        {/* Modern chat bubble */}
+                                        <path d="M12 3C7.03 3 3 6.58 3 11C3 13.39 4.32 15.5 6.4 16.83L5 21L9.73 18.76C10.47 18.91 11.23 19 12 19C16.97 19 21 15.42 21 11C21 6.58 16.97 3 12 3Z" fill="white" fillOpacity="0.95"/>
+                                        {/* Typing dots */}
+                                        <circle cx="8" cy="11" r="1.5" fill="#6366f1"/>
+                                        <circle cx="12" cy="11" r="1.5" fill="#8b5cf6"/>
+                                        <circle cx="16" cy="11" r="1.5" fill="#a855f7"/>
+                                    </svg>
+                                    {/* Notification Badge */}
+                                    {totalUnreadMessages > 0 && (
+                                        <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md border-2 border-white animate-pulse">
+                                            {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* Theme Toggle - Beneath User Icon */}
+                            <div className="animate-slide-up delay-500">
+                                <button 
+                                    onClick={toggleTheme} 
+                                    className={`p-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
+                                        theme === 'dark' 
+                                            ? 'bg-gradient-to-br from-slate-700/90 to-slate-800/90 text-indigo-300 hover:from-slate-600 hover:to-slate-700 border border-white/10' 
+                                            : 'bg-gradient-to-br from-indigo-100/95 to-purple-100/95 text-indigo-600 hover:from-indigo-50 hover:to-purple-50'
+                                    }`}
+                                    title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                                >
+                                    {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </>
             );
@@ -637,7 +674,7 @@
             const subText = theme === 'dark' ? 'text-gray-400' : 'text-slate-500';
 
             return (
-                <div className="space-y-8 animate-in fade-in duration-500 pb-10 pt-24 max-w-6xl mx-auto px-4">
+                <div className="space-y-8 animate-in fade-in duration-500 pb-10 pt-40 max-w-6xl mx-auto px-4">
                     {/* Flashcard Modal */}
                     {showFlashcardModal && (
                         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in zoom-in-95">
@@ -975,7 +1012,7 @@ Respond with ONLY the JSON object, nothing else.`
             const labelClass = theme === 'dark' ? 'text-slate-400 font-bold' : 'text-slate-500 font-bold';
 
             return (
-                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-24 pb-12 max-w-6xl mx-auto px-4">
+                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-40 pb-12 max-w-6xl mx-auto px-4">
                     <ManagerContainer title="New Entry" subtitle="Add a new word to your collection." theme={theme}>
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="grid md:grid-cols-3 gap-6">
@@ -1206,7 +1243,7 @@ Respond with ONLY the JSON object, nothing else.`
             );
 
             return (
-                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-24 pb-12 max-w-6xl mx-auto px-4">
+                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-40 pb-12 max-w-6xl mx-auto px-4">
                     {/* Edit Modal */}
                     {editingItem && (
                         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setEditingItem(null)}>
@@ -1367,7 +1404,7 @@ Respond with ONLY the JSON object, nothing else.`
             );
 
             return (
-                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-24 pb-12 max-w-6xl mx-auto px-4">
+                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-40 pb-12 max-w-6xl mx-auto px-4">
                     {/* Edit Modal */}
                     {editingItem && (
                         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setEditingItem(null)}>
@@ -1521,7 +1558,7 @@ Respond with ONLY the JSON object, nothing else.`
             const labelClass = theme === 'dark' ? 'text-slate-400 font-bold' : 'text-slate-500 font-bold';
 
             return (
-                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-24 pb-12 max-w-6xl mx-auto px-4">
+                <div className="space-y-12 animate-in slide-in-from-right-4 duration-500 pt-40 pb-12 max-w-6xl mx-auto px-4">
                     {/* Edit Modal */}
                     {editingItem && (
                         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setEditingItem(null)}>
@@ -1820,6 +1857,9 @@ Respond with ONLY the JSON object, nothing else.`
             const [imagePreview, setImagePreview] = useState(null);
             const [isUploadingImage, setIsUploadingImage] = useState(false);
             const imageInputRef = useRef(null);
+            const [showRemoveFriendModal, setShowRemoveFriendModal] = useState(false);
+            const [friendToRemove, setFriendToRemove] = useState(null);
+            const [isRemovingFriend, setIsRemovingFriend] = useState(false);
 
             // Scroll to bottom of messages
             const scrollToBottom = () => {
@@ -2334,14 +2374,25 @@ Respond with ONLY the JSON object, nothing else.`
                 }
             };
 
+            // Open remove friend confirmation modal
+            const confirmRemoveFriend = (friend) => {
+                setFriendToRemove(friend);
+                setShowRemoveFriendModal(true);
+            };
+
             // Remove friend
-            const removeFriend = async (friendId) => {
-                if (!user || !friendId) return;
+            const removeFriend = async () => {
+                if (!user || !friendToRemove) return;
+                setIsRemovingFriend(true);
                 try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'friends', friendId));
-                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', friendId, 'friends', user.uid));
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'friends', friendToRemove.id));
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', friendToRemove.id, 'friends', user.uid));
+                    setShowRemoveFriendModal(false);
+                    setFriendToRemove(null);
                 } catch (err) {
                     console.error('Error removing friend:', err);
+                } finally {
+                    setIsRemovingFriend(false);
                 }
             };
 
@@ -2518,13 +2569,13 @@ Respond with ONLY the JSON object, nothing else.`
             const activeBg = theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-50';
 
             return (
-                <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
+                <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 md:p-4 animate-in fade-in duration-200" onClick={onClose}>
                     <div 
-                        className={`${panelBg} backdrop-blur-xl w-full max-w-4xl h-[80vh] rounded-3xl shadow-2xl border ${borderColor} flex overflow-hidden animate-messenger-open relative`}
+                        className={`${panelBg} backdrop-blur-xl w-full max-w-4xl h-[85vh] md:h-[80vh] rounded-3xl shadow-2xl border ${borderColor} flex overflow-hidden animate-messenger-open relative`}
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Left Panel - Conversations/Users List */}
-                        <div className={`w-80 border-r ${borderColor} flex flex-col`}>
+                        <div className={`${activeChat ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r ${borderColor} flex-col`}>
                             {/* Header */}
                             <div className={`p-4 border-b ${borderColor}`}>
                                 <div className="flex items-center justify-between mb-4">
@@ -2733,7 +2784,7 @@ Respond with ONLY the JSON object, nothing else.`
                                                                             <Send className="w-4 h-4 text-indigo-500" />
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => removeFriend(friend.id)}
+                                                                            onClick={() => confirmRemoveFriend(friend)}
                                                                             className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-red-500/20 hover:bg-red-500/30' : 'bg-red-100 hover:bg-red-200'} transition-colors`}
                                                                             title="Remove Friend"
                                                                         >
@@ -3007,7 +3058,7 @@ Respond with ONLY the JSON object, nothing else.`
                         </div>
 
                         {/* Right Panel - Chat Area */}
-                        <div className="flex-1 flex flex-col">
+                        <div className={`${activeChat ? 'flex' : 'hidden md:flex'} flex-1 flex-col`}>
                             {activeChat ? (
                                 <>
                                     {/* Chat Header */}
@@ -3123,6 +3174,48 @@ Respond with ONLY the JSON object, nothing else.`
                                                     >
                                                         {isDeletingConvo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                                         Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Remove Friend Modal */}
+                                    {showRemoveFriendModal && friendToRemove && (
+                                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-3xl" onClick={() => { setShowRemoveFriendModal(false); setFriendToRemove(null); }}>
+                                            <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl w-80 animate-in zoom-in-95`} onClick={e => e.stopPropagation()}>
+                                                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                                                    <UserMinus className="w-6 h-6 text-red-500" />
+                                                </div>
+                                                <h3 className={`text-lg font-bold mb-2 text-center ${textMain}`}>Remove Friend?</h3>
+                                                <div className="flex items-center justify-center gap-3 mb-4">
+                                                    {friendToRemove.photoURL ? (
+                                                        <img src={friendToRemove.photoURL} className="w-12 h-12 rounded-full border-2 border-white/20" alt="" />
+                                                    ) : (
+                                                        <div className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                                            <User className="w-6 h-6 text-indigo-500" />
+                                                        </div>
+                                                    )}
+                                                    <span className={`font-bold ${textMain}`}>{friendToRemove.displayName}</span>
+                                                </div>
+                                                <p className={`text-sm mb-4 text-center ${textSub}`}>
+                                                    Are you sure you want to remove this friend? You can add them back later.
+                                                </p>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => { setShowRemoveFriendModal(false); setFriendToRemove(null); }}
+                                                        disabled={isRemovingFriend}
+                                                        className={`flex-1 py-2.5 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} disabled:opacity-50`}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={removeFriend}
+                                                        disabled={isRemovingFriend}
+                                                        className="flex-1 py-2.5 rounded-xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                                    >
+                                                        {isRemovingFriend ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserMinus className="w-4 h-4" />}
+                                                        Remove
                                                     </button>
                                                 </div>
                                             </div>
@@ -3333,12 +3426,12 @@ Respond with ONLY the JSON object, nothing else.`
                                     </form>
                                 </>
                             ) : (
-                                <div className={`flex-1 flex flex-col items-center justify-center ${textSub}`}>
-                                    <div className={`w-24 h-24 rounded-full ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'} flex items-center justify-center mb-6`}>
-                                        <MessageSquare className="w-12 h-12 text-indigo-500/50" />
+                                <div className={`flex-1 flex flex-col items-center justify-center p-6 ${textSub}`}>
+                                    <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'} flex items-center justify-center mb-4 md:mb-6`}>
+                                        <MessageSquare className="w-10 h-10 md:w-12 md:h-12 text-indigo-500/50" />
                                     </div>
-                                    <h3 className={`text-xl font-bold ${textMain} mb-2`}>Welcome to Messages</h3>
-                                    <p className="text-sm text-center max-w-xs">Search for users to start a conversation and practice vocabulary together!</p>
+                                    <h3 className={`text-lg md:text-xl font-bold ${textMain} mb-2 text-center`}>Welcome to Messages</h3>
+                                    <p className="text-sm text-center max-w-[200px] md:max-w-xs leading-relaxed">Search for users to start a conversation and practice vocabulary together!</p>
                                 </div>
                             )}
                         </div>
@@ -3503,7 +3596,7 @@ Respond with ONLY the JSON object, nothing else.`
                 <div className={`min-h-screen pb-20 selection:bg-indigo-500 selection:text-white relative transition-colors duration-500 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>
                     <div className={`fixed inset-0 z-[-1] ${bgGradient} transition-colors duration-700`}></div>
                     
-                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} />
+                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} setIsMessengerOpen={setIsMessengerOpen} totalUnreadMessages={totalUnreadMessages} />
                     
                     <main>
                         {activeTab === 'landing' && ( <LandingPage setActiveTab={setActiveTab} theme={theme} /> )}
@@ -3531,25 +3624,6 @@ Respond with ONLY the JSON object, nothing else.`
                     
                     {/* Messenger */}
                     <Messenger isOpen={isMessengerOpen} onClose={() => setIsMessengerOpen(false)} user={user} theme={theme} onUnreadChange={setTotalUnreadMessages} />
-                    
-                    {/* Floating Chat Button */}
-                    <button
-                        onClick={() => setIsMessengerOpen(true)}
-                        className={`fixed bottom-6 right-6 z-[100] w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group ${
-                            theme === 'dark' 
-                                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-indigo-500/30 hover:shadow-indigo-500/50' 
-                                : 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-indigo-300 hover:shadow-indigo-400'
-                        }`}
-                        title="Open Messages"
-                    >
-                        <MessagesSquare className="w-6 h-6 transition-transform group-hover:scale-110" />
-                        {/* Notification Badge */}
-                        {totalUnreadMessages > 0 && (
-                            <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1.5 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg animate-in zoom-in border-2 border-white dark:border-slate-900">
-                                {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
-                            </span>
-                        )}
-                    </button>
                 </div>
             );
         };
