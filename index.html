@@ -4191,7 +4191,13 @@ Respond with ONLY the JSON object, nothing else.`
                 if (!user) return;
                 const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'));
                 const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // Ensure doc.id takes precedence over any stored id field
+                    const data = snapshot.docs.map(docSnap => {
+                        const docData = docSnap.data();
+                        // Remove any stored 'id' field to prevent conflicts
+                        const { id: storedId, ...restData } = docData;
+                        return { ...restData, id: docSnap.id };
+                    });
                     setItems(data);
                 }, (err) => console.error("Sync Error:", err));
                 return () => unsubscribe();
@@ -4265,7 +4271,8 @@ Respond with ONLY the JSON object, nothing else.`
                 try {
                     // Add each shared item to the user's vocabulary
                     for (const item of request.items) {
-                        const { originalId, ...itemData } = item;
+                        // Remove originalId and id fields to avoid conflicts with the new document ID
+                        const { originalId, id, ...itemData } = item;
                         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), {
                             ...itemData,
                             // Reset spaced repetition values for the new user
