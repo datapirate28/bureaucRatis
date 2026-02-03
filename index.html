@@ -95,6 +95,68 @@
         .delay-500 { animation-delay: 500ms; }
         .delay-700 { animation-delay: 700ms; }
         .delay-1000 { animation-delay: 1000ms; }
+
+        /* Messenger Animations */
+        @keyframes messageSlideIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-message-in {
+            animation: messageSlideIn 0.3s ease-out forwards;
+        }
+
+        @keyframes messageSent {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        .animate-message-sent {
+            animation: messageSent 0.3s ease-out;
+        }
+
+        @keyframes messengerOpen {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-messenger-open {
+            animation: messengerOpen 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-4px); }
+        }
+        .animate-typing-dot {
+            animation: typing 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        .animate-pulse-ring::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            animation: pulse-ring 1.5s ease-out infinite;
+        }
+
+        /* Smooth scrollbar for messenger */
+        .messenger-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .messenger-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .messenger-scroll::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.3);
+            border-radius: 3px;
+        }
+        .messenger-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.5);
+        }
     </style>
 </head>
 <body class="font-sans overflow-x-hidden transition-colors duration-500">
@@ -1738,6 +1800,14 @@ Respond with ONLY the JSON object, nothing else.`
             const [isSending, setIsSending] = useState(false);
             const [activeTab, setActiveTab] = useState('chats'); // 'chats' or 'users'
             const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+            const [editingMessage, setEditingMessage] = useState(null);
+            const [editMessageText, setEditMessageText] = useState('');
+            const [isTyping, setIsTyping] = useState(false);
+            const [otherUserTyping, setOtherUserTyping] = useState(false);
+            const [showProfileEdit, setShowProfileEdit] = useState(false);
+            const [editDisplayName, setEditDisplayName] = useState('');
+            const [isSavingProfile, setIsSavingProfile] = useState(false);
+            const typingTimeoutRef = useRef(null);
 
             // Scroll to bottom of messages
             const scrollToBottom = () => {
@@ -1874,6 +1944,108 @@ Respond with ONLY the JSON object, nothing else.`
                 return () => unsubscribe();
             }, [activeChat]);
 
+            // Listen for typing indicator
+            useEffect(() => {
+                if (!activeChat || !user) return;
+                const typingRef = doc(db, 'artifacts', appId, 'conversations', activeChat.id, 'typing', activeChat.otherUser?.uid || 'unknown');
+                const unsubscribe = onSnapshot(typingRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        // Only show typing if it's recent (within 3 seconds)
+                        setOtherUserTyping(data.isTyping && (Date.now() - data.timestamp) < 3000);
+                    } else {
+                        setOtherUserTyping(false);
+                    }
+                });
+                return () => unsubscribe();
+            }, [activeChat, user]);
+
+            // Update typing status
+            const updateTypingStatus = async (typing) => {
+                if (!activeChat || !user) return;
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'conversations', activeChat.id, 'typing', user.uid), {
+                        isTyping: typing,
+                        timestamp: Date.now()
+                    });
+                } catch (err) {
+                    console.log('Could not update typing status');
+                }
+            };
+
+            // Handle typing with debounce
+            const handleTyping = (e) => {
+                setNewMessage(e.target.value);
+                
+                if (!isTyping) {
+                    setIsTyping(true);
+                    updateTypingStatus(true);
+                }
+                
+                // Clear existing timeout
+                if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                }
+                
+                // Set new timeout to stop typing indicator
+                typingTimeoutRef.current = setTimeout(() => {
+                    setIsTyping(false);
+                    updateTypingStatus(false);
+                }, 2000);
+            };
+
+            // Save profile name
+            const saveProfileName = async () => {
+                if (!editDisplayName.trim() || !user) return;
+                setIsSavingProfile(true);
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid), {
+                        displayName: editDisplayName.trim(),
+                        lastSeen: Date.now()
+                    }, { merge: true });
+                    setShowProfileEdit(false);
+                } catch (err) {
+                    console.error('Error saving profile:', err);
+                }
+                setIsSavingProfile(false);
+            };
+
+            // Delete message
+            const deleteMessage = async (msgId) => {
+                if (!activeChat) return;
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'conversations', activeChat.id, 'messages', msgId));
+                } catch (err) {
+                    console.error('Error deleting message:', err);
+                }
+            };
+
+            // Edit message
+            const startEditMessage = (msg) => {
+                setEditingMessage(msg.id);
+                setEditMessageText(msg.text);
+            };
+
+            const saveEditMessage = async () => {
+                if (!editMessageText.trim() || !editingMessage || !activeChat) return;
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'conversations', activeChat.id, 'messages', editingMessage), {
+                        text: editMessageText.trim(),
+                        edited: true,
+                        editedAt: Date.now()
+                    });
+                    setEditingMessage(null);
+                    setEditMessageText('');
+                } catch (err) {
+                    console.error('Error editing message:', err);
+                }
+            };
+
+            const cancelEditMessage = () => {
+                setEditingMessage(null);
+                setEditMessageText('');
+            };
+
             // Search users
             const handleSearch = async () => {
                 if (!searchQuery.trim()) {
@@ -1949,6 +2121,13 @@ Respond with ONLY the JSON object, nothing else.`
                 const messageText = newMessage.trim();
                 setNewMessage('');
                 
+                // Clear typing status
+                setIsTyping(false);
+                updateTypingStatus(false);
+                if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                }
+                
                 try {
                     // Add message to subcollection
                     await addDoc(collection(db, 'artifacts', appId, 'conversations', activeChat.id, 'messages'), {
@@ -1998,9 +2177,9 @@ Respond with ONLY the JSON object, nothing else.`
             const activeBg = theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-50';
 
             return (
-                <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+                <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
                     <div 
-                        className={`${panelBg} backdrop-blur-xl w-full max-w-4xl h-[80vh] rounded-3xl shadow-2xl border ${borderColor} flex overflow-hidden animate-in zoom-in-95 duration-300`}
+                        className={`${panelBg} backdrop-blur-xl w-full max-w-4xl h-[80vh] rounded-3xl shadow-2xl border ${borderColor} flex overflow-hidden animate-messenger-open relative`}
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Left Panel - Conversations/Users List */}
@@ -2248,28 +2427,85 @@ Respond with ONLY the JSON object, nothing else.`
                             {activeChat ? (
                                 <>
                                     {/* Chat Header */}
-                                    <div className={`p-4 border-b ${borderColor} flex items-center gap-3`}>
-                                        <button 
-                                            onClick={() => setActiveChat(null)}
-                                            className={`p-2 rounded-xl ${hoverBg} transition-colors md:hidden ${textSub}`}
-                                        >
-                                            <ArrowLeft className="w-5 h-5" />
-                                        </button>
-                                        {activeChat.otherUser?.photoURL ? (
-                                            <img src={activeChat.otherUser.photoURL} className="w-10 h-10 rounded-full" alt="" />
-                                        ) : (
-                                            <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
-                                                <User className="w-5 h-5 text-indigo-500" />
+                                    <div className={`p-4 border-b ${borderColor} flex items-center justify-between`}>
+                                        <div className="flex items-center gap-3">
+                                            <button 
+                                                onClick={() => setActiveChat(null)}
+                                                className={`p-2 rounded-xl ${hoverBg} transition-colors md:hidden ${textSub}`}
+                                            >
+                                                <ArrowLeft className="w-5 h-5" />
+                                            </button>
+                                            {activeChat.otherUser?.photoURL ? (
+                                                <img src={activeChat.otherUser.photoURL} className="w-10 h-10 rounded-full" alt="" />
+                                            ) : (
+                                                <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                                    <User className="w-5 h-5 text-indigo-500" />
+                                                </div>
+                                            )}
+                                            <div>
+                                                <div className={`font-bold ${textMain}`}>{activeChat.otherUser?.displayName || 'User'}</div>
+                                                <div className={`text-xs ${textSub}`}>
+                                                    {otherUserTyping ? (
+                                                        <span className="text-indigo-500 flex items-center gap-1">
+                                                            <span className="flex gap-0.5">
+                                                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></span>
+                                                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
+                                                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
+                                                            </span>
+                                                            typing...
+                                                        </span>
+                                                    ) : activeChat.otherUser?.lastSeen && (Date.now() - activeChat.otherUser.lastSeen) < 5 * 60 * 1000 ? (
+                                                        <span className="text-emerald-500">● Online</span>
+                                                    ) : (
+                                                        'Active on bureaucRatis'
+                                                    )}
+                                                </div>
                                             </div>
-                                        )}
-                                        <div>
-                                            <div className={`font-bold ${textMain}`}>{activeChat.otherUser?.displayName || 'User'}</div>
-                                            <div className={`text-xs ${textSub}`}>Active on bureaucRatis</div>
                                         </div>
+                                        <button 
+                                            onClick={() => { setEditDisplayName(user?.displayName || ''); setShowProfileEdit(true); }}
+                                            className={`p-2 rounded-xl ${hoverBg} transition-colors ${textSub} hover:text-indigo-500`}
+                                            title="Edit your profile name"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
                                     </div>
 
+                                    {/* Profile Edit Modal */}
+                                    {showProfileEdit && (
+                                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-3xl" onClick={() => setShowProfileEdit(false)}>
+                                            <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl w-80 animate-in zoom-in-95`} onClick={e => e.stopPropagation()}>
+                                                <h3 className={`text-lg font-bold mb-4 ${textMain}`}>Edit Profile Name</h3>
+                                                <input
+                                                    type="text"
+                                                    value={editDisplayName}
+                                                    onChange={e => setEditDisplayName(e.target.value)}
+                                                    placeholder="Enter your display name"
+                                                    className={`w-full px-4 py-3 rounded-xl border ${inputBg} outline-none focus:ring-2 focus:ring-indigo-500/50 mb-4`}
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setShowProfileEdit(false)}
+                                                        className={`flex-1 py-2.5 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={saveProfileName}
+                                                        disabled={!editDisplayName.trim() || isSavingProfile}
+                                                        className="flex-1 py-2.5 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-600 hover:to-violet-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                                    >
+                                                        {isSavingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Messages */}
-                                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-3 messenger-scroll">
                                         {messages.length === 0 ? (
                                             <div className={`h-full flex flex-col items-center justify-center ${textSub}`}>
                                                 <div className={`w-16 h-16 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center mb-4`}>
@@ -2279,11 +2515,16 @@ Respond with ONLY the JSON object, nothing else.`
                                                 <p className="text-sm">Say hello to {activeChat.otherUser?.displayName || 'this user'}</p>
                                             </div>
                                         ) : (
-                                            messages.map(msg => {
+                                            messages.map((msg, index) => {
                                                 const isOwn = msg.senderId === user.uid;
+                                                const isEditing = editingMessage === msg.id;
                                                 return (
-                                                    <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                                                        <div className={`flex items-end gap-2 max-w-[70%] ${isOwn ? 'flex-row-reverse' : ''}`}>
+                                                    <div 
+                                                        key={msg.id} 
+                                                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 fade-in duration-300`}
+                                                        style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
+                                                    >
+                                                        <div className={`flex items-end gap-2 max-w-[70%] ${isOwn ? 'flex-row-reverse' : ''} group`}>
                                                             {!isOwn && (
                                                                 msg.senderPhoto ? (
                                                                     <img src={msg.senderPhoto} className="w-6 h-6 rounded-full shrink-0" alt="" />
@@ -2293,22 +2534,87 @@ Respond with ONLY the JSON object, nothing else.`
                                                                     </div>
                                                                 )
                                                             )}
-                                                            <div className={`px-4 py-2.5 rounded-2xl ${
-                                                                isOwn 
-                                                                    ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-br-md' 
-                                                                    : theme === 'dark' 
-                                                                        ? 'bg-slate-800 text-white rounded-bl-md' 
-                                                                        : 'bg-slate-100 text-slate-800 rounded-bl-md'
-                                                            }`}>
-                                                                <p className="text-sm leading-relaxed">{msg.text}</p>
-                                                                <p className={`text-[10px] mt-1 ${isOwn ? 'text-white/70' : textSub}`}>
-                                                                    {formatTime(msg.timestamp)}
-                                                                </p>
+                                                            <div className="relative">
+                                                                {isEditing ? (
+                                                                    <div className={`px-4 py-2.5 rounded-2xl ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editMessageText}
+                                                                            onChange={e => setEditMessageText(e.target.value)}
+                                                                            className={`w-full bg-transparent outline-none text-sm ${textMain}`}
+                                                                            autoFocus
+                                                                            onKeyDown={e => {
+                                                                                if (e.key === 'Enter') saveEditMessage();
+                                                                                if (e.key === 'Escape') cancelEditMessage();
+                                                                            }}
+                                                                        />
+                                                                        <div className="flex gap-1 mt-2">
+                                                                            <button onClick={cancelEditMessage} className="text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Cancel</button>
+                                                                            <button onClick={saveEditMessage} className="text-xs px-2 py-1 rounded bg-indigo-500 text-white">Save</button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        <div className={`px-4 py-2.5 rounded-2xl transition-all ${
+                                                                            isOwn 
+                                                                                ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-br-md' 
+                                                                                : theme === 'dark' 
+                                                                                    ? 'bg-slate-800 text-white rounded-bl-md' 
+                                                                                    : 'bg-slate-100 text-slate-800 rounded-bl-md'
+                                                                        }`}>
+                                                                            <p className="text-sm leading-relaxed">{msg.text}</p>
+                                                                            <p className={`text-[10px] mt-1 flex items-center gap-1 ${isOwn ? 'text-white/70' : textSub}`}>
+                                                                                {formatTime(msg.timestamp)}
+                                                                                {msg.edited && <span className="italic">(edited)</span>}
+                                                                            </p>
+                                                                        </div>
+                                                                        {/* Edit/Delete buttons - only for own messages */}
+                                                                        {isOwn && (
+                                                                            <div className={`absolute ${isOwn ? 'left-0 -translate-x-full pr-2' : 'right-0 translate-x-full pl-2'} top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                                                                <button
+                                                                                    onClick={() => startEditMessage(msg)}
+                                                                                    className={`p-1.5 rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-white hover:bg-slate-100 text-slate-500 shadow-sm'}`}
+                                                                                    title="Edit message"
+                                                                                >
+                                                                                    <Pencil className="w-3 h-3" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => deleteMessage(msg.id)}
+                                                                                    className={`p-1.5 rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-700 hover:bg-red-500/20 text-slate-300 hover:text-red-400' : 'bg-white hover:bg-red-50 text-slate-500 hover:text-red-500 shadow-sm'}`}
+                                                                                    title="Delete message"
+                                                                                >
+                                                                                    <Trash2 className="w-3 h-3" />
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
                                                 );
                                             })
+                                        )}
+                                        {/* Typing indicator */}
+                                        {otherUserTyping && (
+                                            <div className="flex justify-start animate-in slide-in-from-bottom-2 fade-in duration-200">
+                                                <div className="flex items-end gap-2">
+                                                    {activeChat.otherUser?.photoURL ? (
+                                                        <img src={activeChat.otherUser.photoURL} className="w-6 h-6 rounded-full shrink-0" alt="" />
+                                                    ) : (
+                                                        <div className={`w-6 h-6 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} flex items-center justify-center shrink-0`}>
+                                                            <User className="w-3 h-3" />
+                                                        </div>
+                                                    )}
+                                                    <div className={`px-4 py-3 rounded-2xl rounded-bl-md ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                                        <div className="flex gap-1">
+                                                            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '0ms', animationDuration: '0.6s'}}></span>
+                                                            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '150ms', animationDuration: '0.6s'}}></span>
+                                                            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '300ms', animationDuration: '0.6s'}}></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         )}
                                         <div ref={messagesEndRef} />
                                     </div>
@@ -2320,15 +2626,15 @@ Respond with ONLY the JSON object, nothing else.`
                                                 type="text"
                                                 placeholder="Type a message..."
                                                 value={newMessage}
-                                                onChange={e => setNewMessage(e.target.value)}
+                                                onChange={handleTyping}
                                                 className={`flex-1 px-4 py-3 rounded-xl border ${inputBg} outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all`}
                                             />
                                             <button
                                                 type="submit"
                                                 disabled={!newMessage.trim() || isSending}
-                                                className="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold hover:from-indigo-600 hover:to-violet-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                className={`px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold hover:from-indigo-600 hover:to-violet-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${isSending ? 'animate-pulse' : ''}`}
                                             >
-                                                {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                                {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 transition-transform group-hover:translate-x-0.5" />}
                                             </button>
                                         </div>
                                     </form>
