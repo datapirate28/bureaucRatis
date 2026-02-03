@@ -119,7 +119,7 @@
             Search, Sparkles, Zap, Layers, Loader2, AlertTriangle, User, 
             LogOut, ShieldCheck, LogIn, ChevronDown, Play, ArrowLeft, Trophy, 
             Book, Mic, Volume2, Wand2, Star, ChevronRight, Activity, Grid, List,
-            Moon, Sun, Upload, Pencil
+            Moon, Sun, Upload, Pencil, Send, Users, MessageSquare, Circle
         } from 'lucide-react';
         
         // Import Firebase
@@ -143,9 +143,13 @@
             deleteDoc, 
             doc, 
             getDoc,
+            getDocs,
             setDoc,
             updateDoc,
-            serverTimestamp 
+            serverTimestamp,
+            orderBy,
+            where,
+            limit
         } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
         // --- FIREBASE SETUP ---
@@ -1720,6 +1724,630 @@ Respond with ONLY the JSON object, nothing else.`
             </div>
         );
 
+        // --- MESSENGER COMPONENT ---
+        const Messenger = ({ isOpen, onClose, user, theme }) => {
+            const [conversations, setConversations] = useState([]);
+            const [activeChat, setActiveChat] = useState(null);
+            const [messages, setMessages] = useState([]);
+            const [newMessage, setNewMessage] = useState('');
+            const [searchQuery, setSearchQuery] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+            const [isSearching, setIsSearching] = useState(false);
+            const [allUsers, setAllUsers] = useState([]);
+            const messagesEndRef = useRef(null);
+            const [isSending, setIsSending] = useState(false);
+            const [activeTab, setActiveTab] = useState('chats'); // 'chats' or 'users'
+            const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+            // Scroll to bottom of messages
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            };
+
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages]);
+
+            // Save user profile to users collection when they open messenger
+            useEffect(() => {
+                if (!user || !isOpen) return;
+                const saveUserProfile = async () => {
+                    try {
+                        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'info'), {
+                            uid: user.uid,
+                            displayName: user.displayName || 'Anonymous',
+                            photoURL: user.photoURL || '',
+                            email: user.email || '',
+                            lastSeen: Date.now()
+                        }, { merge: true });
+                    } catch (err) {
+                        console.error('Error saving user profile:', err);
+                    }
+                };
+                saveUserProfile();
+            }, [user, isOpen]);
+
+            // Load all users for search
+            useEffect(() => {
+                if (!user || !isOpen) return;
+                setIsLoadingUsers(true);
+                const loadUsers = async () => {
+                    try {
+                        const usersQuery = query(collection(db, 'artifacts', appId, 'chatUsers'));
+                        const snapshot = await getDocs(usersQuery);
+                        const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(u => u.uid !== user.uid);
+                        setAllUsers(users);
+                    } catch (err) {
+                        console.error('Error loading users:', err);
+                    }
+                    setIsLoadingUsers(false);
+                };
+                loadUsers();
+                
+                // Also set up real-time listener for users
+                const unsubscribe = onSnapshot(
+                    query(collection(db, 'artifacts', appId, 'chatUsers')),
+                    (snapshot) => {
+                        const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(u => u.uid !== user.uid);
+                        setAllUsers(users);
+                    }
+                );
+                return () => unsubscribe();
+            }, [user, isOpen]);
+
+            // Save user to global chat users list
+            useEffect(() => {
+                if (!user || !isOpen) return;
+                const saveToGlobalUsers = async () => {
+                    try {
+                        await setDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid), {
+                            uid: user.uid,
+                            displayName: user.displayName || 'Anonymous',
+                            photoURL: user.photoURL || '',
+                            email: user.email || '',
+                            lastSeen: Date.now()
+                        }, { merge: true });
+                    } catch (err) {
+                        console.error('Error saving to global users:', err);
+                    }
+                };
+                saveToGlobalUsers();
+                
+                // Update lastSeen periodically while messenger is open
+                const interval = setInterval(() => {
+                    if (isOpen) {
+                        setDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid), {
+                            lastSeen: Date.now()
+                        }, { merge: true }).catch(err => console.log('Could not update lastSeen'));
+                    }
+                }, 30000); // Update every 30 seconds
+                
+                return () => clearInterval(interval);
+            }, [user, isOpen]);
+
+            // Load conversations
+            useEffect(() => {
+                if (!user || !isOpen) return;
+                // Query conversations where user is a participant
+                // Note: This query may require a composite index in Firebase Console
+                const q = query(
+                    collection(db, 'artifacts', appId, 'conversations'),
+                    where('participants', 'array-contains', user.uid)
+                );
+                const unsubscribe = onSnapshot(q, async (snapshot) => {
+                    const convosData = await Promise.all(snapshot.docs.map(async (docSnap) => {
+                        const data = docSnap.data();
+                        const otherUserId = data.participants.find(p => p !== user.uid);
+                        // Get other user's profile
+                        let otherUser = { displayName: 'Unknown User', photoURL: '', lastSeen: null };
+                        try {
+                            const userDoc = await getDoc(doc(db, 'artifacts', appId, 'chatUsers', otherUserId));
+                            if (userDoc.exists()) {
+                                otherUser = userDoc.data();
+                            }
+                        } catch (err) {
+                            console.log('Could not fetch user profile');
+                        }
+                        return { id: docSnap.id, ...data, otherUser };
+                    }));
+                    // Sort by lastMessageTime on client side
+                    convosData.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+                    setConversations(convosData);
+                }, (err) => {
+                    console.error('Error loading conversations:', err);
+                    // If index error, conversations will just be empty
+                });
+                return () => unsubscribe();
+            }, [user, isOpen]);
+
+            // Load messages for active chat
+            useEffect(() => {
+                if (!activeChat) return;
+                const q = query(
+                    collection(db, 'artifacts', appId, 'conversations', activeChat.id, 'messages'),
+                    orderBy('timestamp', 'asc')
+                );
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setMessages(msgs);
+                }, (err) => console.error('Error loading messages:', err));
+                return () => unsubscribe();
+            }, [activeChat]);
+
+            // Search users
+            const handleSearch = async () => {
+                if (!searchQuery.trim()) {
+                    setSearchResults([]);
+                    return;
+                }
+                setIsSearching(true);
+                try {
+                    const searchLower = searchQuery.toLowerCase();
+                    const results = allUsers.filter(u => 
+                        u.displayName?.toLowerCase().includes(searchLower) || 
+                        u.email?.toLowerCase().includes(searchLower)
+                    );
+                    setSearchResults(results);
+                } catch (err) {
+                    console.error('Search error:', err);
+                }
+                setIsSearching(false);
+            };
+
+            useEffect(() => {
+                const debounce = setTimeout(() => {
+                    handleSearch();
+                }, 300);
+                return () => clearTimeout(debounce);
+            }, [searchQuery, allUsers]);
+
+            // Start or open conversation
+            const startConversation = async (otherUser) => {
+                if (!user || !otherUser) return;
+                
+                // Check if conversation already exists
+                const existingConvo = conversations.find(c => 
+                    c.participants.includes(otherUser.uid)
+                );
+                
+                if (existingConvo) {
+                    setActiveChat(existingConvo);
+                    setSearchQuery('');
+                    setSearchResults([]);
+                    setActiveTab('chats'); // Switch to chats tab
+                    return;
+                }
+
+                // Create new conversation
+                try {
+                    const convoRef = await addDoc(collection(db, 'artifacts', appId, 'conversations'), {
+                        participants: [user.uid, otherUser.uid],
+                        lastMessage: '',
+                        lastMessageTime: Date.now(),
+                        createdAt: Date.now()
+                    });
+                    
+                    setActiveChat({ 
+                        id: convoRef.id, 
+                        participants: [user.uid, otherUser.uid],
+                        otherUser 
+                    });
+                    setSearchQuery('');
+                    setSearchResults([]);
+                    setActiveTab('chats'); // Switch to chats tab
+                } catch (err) {
+                    console.error('Error creating conversation:', err);
+                }
+            };
+
+            // Send message
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                if (!newMessage.trim() || !activeChat || isSending) return;
+                
+                setIsSending(true);
+                const messageText = newMessage.trim();
+                setNewMessage('');
+                
+                try {
+                    // Add message to subcollection
+                    await addDoc(collection(db, 'artifacts', appId, 'conversations', activeChat.id, 'messages'), {
+                        text: messageText,
+                        senderId: user.uid,
+                        senderName: user.displayName || 'Anonymous',
+                        senderPhoto: user.photoURL || '',
+                        timestamp: Date.now()
+                    });
+                    
+                    // Update conversation's last message
+                    await updateDoc(doc(db, 'artifacts', appId, 'conversations', activeChat.id), {
+                        lastMessage: messageText,
+                        lastMessageTime: Date.now()
+                    });
+                } catch (err) {
+                    console.error('Error sending message:', err);
+                    setNewMessage(messageText);
+                }
+                setIsSending(false);
+            };
+
+            const formatTime = (timestamp) => {
+                if (!timestamp) return '';
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 0) {
+                    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else if (diffDays === 1) {
+                    return 'Yesterday';
+                } else if (diffDays < 7) {
+                    return date.toLocaleDateString([], { weekday: 'short' });
+                }
+                return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            };
+
+            if (!isOpen) return null;
+
+            const panelBg = theme === 'dark' ? 'bg-[#0f172a]/95' : 'bg-white/95';
+            const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+            const textMain = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-slate-400' : 'text-slate-500';
+            const inputBg = theme === 'dark' ? 'bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400';
+            const hoverBg = theme === 'dark' ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50';
+            const activeBg = theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-50';
+
+            return (
+                <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+                    <div 
+                        className={`${panelBg} backdrop-blur-xl w-full max-w-4xl h-[80vh] rounded-3xl shadow-2xl border ${borderColor} flex overflow-hidden animate-in zoom-in-95 duration-300`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Left Panel - Conversations/Users List */}
+                        <div className={`w-80 border-r ${borderColor} flex flex-col`}>
+                            {/* Header */}
+                            <div className={`p-4 border-b ${borderColor}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className={`text-xl font-black ${textMain} flex items-center gap-2`}>
+                                        <MessageSquare className="w-5 h-5 text-indigo-500" />
+                                        Messages
+                                    </h2>
+                                    <button 
+                                        onClick={onClose}
+                                        className={`p-2 rounded-xl ${hoverBg} transition-colors ${textSub}`}
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                
+                                {/* Tabs */}
+                                <div className={`flex gap-1 p-1 rounded-xl mb-3 ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                                    <button
+                                        onClick={() => setActiveTab('chats')}
+                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                                            activeTab === 'chats'
+                                                ? theme === 'dark' 
+                                                    ? 'bg-indigo-500 text-white shadow-lg' 
+                                                    : 'bg-white text-indigo-600 shadow-md'
+                                                : theme === 'dark'
+                                                    ? 'text-slate-400 hover:text-white'
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        <MessageCircle className="w-4 h-4" />
+                                        Chats
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('users')}
+                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                                            activeTab === 'users'
+                                                ? theme === 'dark' 
+                                                    ? 'bg-indigo-500 text-white shadow-lg' 
+                                                    : 'bg-white text-indigo-600 shadow-md'
+                                                : theme === 'dark'
+                                                    ? 'text-slate-400 hover:text-white'
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        <Users className="w-4 h-4" />
+                                        Users ({allUsers.length})
+                                    </button>
+                                </div>
+                                
+                                {/* Search */}
+                                <div className="relative">
+                                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSub}`} />
+                                    <input
+                                        type="text"
+                                        placeholder={activeTab === 'chats' ? "Search conversations..." : "Search users..."}
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${inputBg} outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-sm`}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Content based on active tab */}
+                            <div className="flex-1 overflow-y-auto">
+                                {activeTab === 'users' ? (
+                                    /* Users Tab */
+                                    <div className="p-2">
+                                        {isLoadingUsers ? (
+                                            <div className={`p-8 text-center ${textSub}`}>
+                                                <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin text-indigo-500" />
+                                                <p className="text-sm">Loading users...</p>
+                                            </div>
+                                        ) : allUsers.length === 0 ? (
+                                            <div className={`p-8 text-center ${textSub}`}>
+                                                <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                                <p className="text-sm font-medium">No other users yet</p>
+                                                <p className="text-xs mt-1">Be the first to invite friends!</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className={`text-xs font-bold uppercase tracking-wider px-2 py-2 ${textSub}`}>
+                                                    Registered Users ({allUsers.filter(u => 
+                                                        !searchQuery || 
+                                                        u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                        u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+                                                    ).length})
+                                                </div>
+                                                {allUsers
+                                                    .filter(u => 
+                                                        !searchQuery || 
+                                                        u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                        u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+                                                    )
+                                                    .map(userItem => {
+                                                        const isOnline = userItem.lastSeen && (Date.now() - userItem.lastSeen) < 5 * 60 * 1000;
+                                                        const hasConversation = conversations.some(c => c.participants.includes(userItem.uid));
+                                                        return (
+                                                            <button
+                                                                key={userItem.uid}
+                                                                onClick={() => startConversation(userItem)}
+                                                                className={`w-full p-3 rounded-xl ${hoverBg} transition-all flex items-center gap-3 group`}
+                                                            >
+                                                                <div className="relative">
+                                                                    {userItem.photoURL ? (
+                                                                        <img src={userItem.photoURL} className="w-11 h-11 rounded-full border-2 border-white/20" alt="" />
+                                                                    ) : (
+                                                                        <div className={`w-11 h-11 rounded-full ${theme === 'dark' ? 'bg-gradient-to-br from-indigo-500/30 to-violet-500/30' : 'bg-gradient-to-br from-indigo-100 to-violet-100'} flex items-center justify-center`}>
+                                                                            <User className="w-5 h-5 text-indigo-500" />
+                                                                        </div>
+                                                                    )}
+                                                                    {/* Online indicator */}
+                                                                    <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 ${theme === 'dark' ? 'border-[#0f172a]' : 'border-white'} ${isOnline ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+                                                                </div>
+                                                                <div className="flex-1 text-left min-w-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`font-bold text-sm truncate ${textMain}`}>{userItem.displayName}</span>
+                                                                        {hasConversation && (
+                                                                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                                                Chatting
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className={`text-xs truncate ${textSub}`}>
+                                                                        {isOnline ? (
+                                                                            <span className="text-emerald-500 font-medium">● Online now</span>
+                                                                        ) : userItem.lastSeen ? (
+                                                                            `Last seen ${formatTime(userItem.lastSeen)}`
+                                                                        ) : (
+                                                                            userItem.email
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'}`}>
+                                                                    <Send className="w-4 h-4 text-indigo-500" />
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                            </>
+                                        )}
+                                    </div>
+                                ) : (
+                                    /* Chats Tab */
+                                    <>
+                                        {searchQuery && searchResults.length > 0 ? (
+                                            <div className="p-2">
+                                                <div className={`text-xs font-bold uppercase tracking-wider px-2 py-2 ${textSub}`}>Search Results</div>
+                                                {searchResults.map(userResult => (
+                                                    <button
+                                                        key={userResult.uid}
+                                                        onClick={() => startConversation(userResult)}
+                                                        className={`w-full p-3 rounded-xl ${hoverBg} transition-colors flex items-center gap-3`}
+                                                    >
+                                                        <div className="relative">
+                                                            {userResult.photoURL ? (
+                                                                <img src={userResult.photoURL} className="w-10 h-10 rounded-full" alt="" />
+                                                            ) : (
+                                                                <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                                                    <User className="w-5 h-5 text-indigo-500" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 text-left">
+                                                            <div className={`font-bold text-sm ${textMain}`}>{userResult.displayName}</div>
+                                                            <div className={`text-xs ${textSub}`}>{userResult.email}</div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : searchQuery && searchResults.length === 0 && !isSearching ? (
+                                            <div className={`p-4 text-center ${textSub}`}>
+                                                <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                                <p className="text-sm">No users found</p>
+                                            </div>
+                                        ) : (
+                                            <div className="p-2">
+                                                {conversations.length === 0 ? (
+                                                    <div className={`p-8 text-center ${textSub}`}>
+                                                        <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                                        <p className="text-sm font-medium">No conversations yet</p>
+                                                        <p className="text-xs mt-1">Go to "Users" tab to start chatting!</p>
+                                                        <button 
+                                                            onClick={() => setActiveTab('users')}
+                                                            className={`mt-4 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                                                                theme === 'dark' 
+                                                                    ? 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30' 
+                                                                    : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
+                                                            }`}
+                                                        >
+                                                            <Users className="w-4 h-4 inline mr-2" />
+                                                            Browse Users
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    conversations
+                                                        .filter(c => 
+                                                            !searchQuery || 
+                                                            c.otherUser?.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                            c.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase())
+                                                        )
+                                                        .map(convo => (
+                                                            <button
+                                                                key={convo.id}
+                                                                onClick={() => setActiveChat(convo)}
+                                                                className={`w-full p-3 rounded-xl transition-colors flex items-center gap-3 ${
+                                                                    activeChat?.id === convo.id ? activeBg : hoverBg
+                                                                }`}
+                                                            >
+                                                                <div className="relative">
+                                                                    {convo.otherUser?.photoURL ? (
+                                                                        <img src={convo.otherUser.photoURL} className="w-12 h-12 rounded-full" alt="" />
+                                                                    ) : (
+                                                                        <div className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                                                            <User className="w-6 h-6 text-indigo-500" />
+                                                                        </div>
+                                                                    )}
+                                                                    {/* Online indicator for conversations */}
+                                                                    {convo.otherUser?.lastSeen && (Date.now() - convo.otherUser.lastSeen) < 5 * 60 * 1000 && (
+                                                                        <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 ${theme === 'dark' ? 'border-[#0f172a]' : 'border-white'} bg-emerald-500`}></div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 text-left min-w-0">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className={`font-bold text-sm truncate ${textMain}`}>{convo.otherUser?.displayName || 'User'}</span>
+                                                                        <span className={`text-[10px] ${textSub}`}>{formatTime(convo.lastMessageTime)}</span>
+                                                                    </div>
+                                                                    <p className={`text-xs truncate ${textSub}`}>{convo.lastMessage || 'No messages yet'}</p>
+                                                                </div>
+                                                            </button>
+                                                        ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right Panel - Chat Area */}
+                        <div className="flex-1 flex flex-col">
+                            {activeChat ? (
+                                <>
+                                    {/* Chat Header */}
+                                    <div className={`p-4 border-b ${borderColor} flex items-center gap-3`}>
+                                        <button 
+                                            onClick={() => setActiveChat(null)}
+                                            className={`p-2 rounded-xl ${hoverBg} transition-colors md:hidden ${textSub}`}
+                                        >
+                                            <ArrowLeft className="w-5 h-5" />
+                                        </button>
+                                        {activeChat.otherUser?.photoURL ? (
+                                            <img src={activeChat.otherUser.photoURL} className="w-10 h-10 rounded-full" alt="" />
+                                        ) : (
+                                            <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                                <User className="w-5 h-5 text-indigo-500" />
+                                            </div>
+                                        )}
+                                        <div>
+                                            <div className={`font-bold ${textMain}`}>{activeChat.otherUser?.displayName || 'User'}</div>
+                                            <div className={`text-xs ${textSub}`}>Active on bureaucRatis</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Messages */}
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                        {messages.length === 0 ? (
+                                            <div className={`h-full flex flex-col items-center justify-center ${textSub}`}>
+                                                <div className={`w-16 h-16 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center mb-4`}>
+                                                    <MessageCircle className="w-8 h-8 text-indigo-500" />
+                                                </div>
+                                                <p className="font-medium">Start the conversation!</p>
+                                                <p className="text-sm">Say hello to {activeChat.otherUser?.displayName || 'this user'}</p>
+                                            </div>
+                                        ) : (
+                                            messages.map(msg => {
+                                                const isOwn = msg.senderId === user.uid;
+                                                return (
+                                                    <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                                                        <div className={`flex items-end gap-2 max-w-[70%] ${isOwn ? 'flex-row-reverse' : ''}`}>
+                                                            {!isOwn && (
+                                                                msg.senderPhoto ? (
+                                                                    <img src={msg.senderPhoto} className="w-6 h-6 rounded-full shrink-0" alt="" />
+                                                                ) : (
+                                                                    <div className={`w-6 h-6 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} flex items-center justify-center shrink-0`}>
+                                                                        <User className="w-3 h-3" />
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                            <div className={`px-4 py-2.5 rounded-2xl ${
+                                                                isOwn 
+                                                                    ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-br-md' 
+                                                                    : theme === 'dark' 
+                                                                        ? 'bg-slate-800 text-white rounded-bl-md' 
+                                                                        : 'bg-slate-100 text-slate-800 rounded-bl-md'
+                                                            }`}>
+                                                                <p className="text-sm leading-relaxed">{msg.text}</p>
+                                                                <p className={`text-[10px] mt-1 ${isOwn ? 'text-white/70' : textSub}`}>
+                                                                    {formatTime(msg.timestamp)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                        <div ref={messagesEndRef} />
+                                    </div>
+
+                                    {/* Message Input */}
+                                    <form onSubmit={sendMessage} className={`p-4 border-t ${borderColor}`}>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Type a message..."
+                                                value={newMessage}
+                                                onChange={e => setNewMessage(e.target.value)}
+                                                className={`flex-1 px-4 py-3 rounded-xl border ${inputBg} outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all`}
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={!newMessage.trim() || isSending}
+                                                className="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold hover:from-indigo-600 hover:to-violet-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                            >
+                                                {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </>
+                            ) : (
+                                <div className={`flex-1 flex flex-col items-center justify-center ${textSub}`}>
+                                    <div className={`w-24 h-24 rounded-full ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'} flex items-center justify-center mb-6`}>
+                                        <MessageSquare className="w-12 h-12 text-indigo-500/50" />
+                                    </div>
+                                    <h3 className={`text-xl font-bold ${textMain} mb-2`}>Welcome to Messages</h3>
+                                    <p className="text-sm text-center max-w-xs">Search for users to start a conversation and practice vocabulary together!</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const App = () => {
             const [user, setUser] = useState(null);
             const [items, setItems] = useState([]);
@@ -1746,6 +2374,9 @@ Respond with ONLY the JSON object, nothing else.`
             const removeToast = (id) => {
                 setToasts(prev => prev.filter(t => t.id !== id));
             };
+            
+            // Messenger state
+            const [isMessengerOpen, setIsMessengerOpen] = useState(false);
 
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -1897,6 +2528,22 @@ Respond with ONLY the JSON object, nothing else.`
                     
                     {/* Toast Notifications */}
                     <ToastContainer toasts={toasts} removeToast={removeToast} theme={theme} />
+                    
+                    {/* Messenger */}
+                    <Messenger isOpen={isMessengerOpen} onClose={() => setIsMessengerOpen(false)} user={user} theme={theme} />
+                    
+                    {/* Floating Chat Button */}
+                    <button
+                        onClick={() => setIsMessengerOpen(true)}
+                        className={`fixed bottom-6 right-6 z-[100] w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
+                            theme === 'dark' 
+                                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-indigo-500/30 hover:shadow-indigo-500/50' 
+                                : 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-indigo-300 hover:shadow-indigo-400'
+                        }`}
+                        title="Open Messages"
+                    >
+                        <MessageSquare className="w-6 h-6" />
+                    </button>
                 </div>
             );
         };
