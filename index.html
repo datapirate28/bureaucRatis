@@ -256,7 +256,8 @@
             LogOut, ShieldCheck, LogIn, ChevronDown, Play, ArrowLeft, Trophy, 
             Book, Mic, Volume2, Wand2, Star, ChevronRight, Activity, Grid, List,
             Moon, Sun, Upload, Pencil, Send, Users, MessageSquare, Circle, Heart, UserPlus, UserMinus, UserCheck,
-            CheckCheck, Image as ImageIcon, MessagesSquare, Share2, Inbox, Gift, Package, FileText, ExternalLink, Eye
+            CheckCheck, Image as ImageIcon, MessagesSquare, Share2, Inbox, Gift, Package, FileText, ExternalLink, Eye,
+            Shield, Ban, Mail, AlertCircle, RefreshCw
         } from 'lucide-react';
         
         // Import Firebase
@@ -311,6 +312,10 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = 'fluency-flow-standalone';
+
+        // --- ADMIN CONFIG ---
+        const ADMIN_EMAIL = 'codingsprint.com@gmail.com';
+        const isAdmin = (user) => user?.email === ADMIN_EMAIL;
 
         // --- UTILS ---
         const calculateNextReview = (rating, previousInterval, previousEasiness) => {
@@ -518,10 +523,13 @@
         );
 
         const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages, setIsShareModalOpen, setIsSharingInboxOpen, shareRequestCount }) => {
+            // Build nav items - include Admin tab only for admin user
             const navItems = [
                 { id: 'dashboard', label: 'Dashboard', icon: Grid },
                 { id: 'mylearning', label: 'My Learning', icon: Book },
                 { id: 'peers', label: 'Peers', icon: Users },
+                // Admin tab - only visible to admin
+                ...(isAdmin(user) ? [{ id: 'admin', label: 'Admin', icon: Shield }] : [])
             ];
             const level = Math.floor((items?.length || 0) / 5) + 1;
             
@@ -2461,13 +2469,21 @@ Respond with ONLY the JSON object, nothing else.`
                 setIsUpdating(false);
             };
 
-            // Delete post
+            // Delete post (author or admin can delete)
             const handleDeletePost = async (postId) => {
                 if (!user) return;
                 const post = posts.find(p => p.id === postId);
-                if (!post || post.authorId !== user.uid) return; // Only author can delete
+                // Allow deletion if user is the author OR if user is admin
+                if (!post || (post.authorId !== user.uid && !isAdmin(user))) return;
                 
                 try {
+                    // If admin is deleting, also delete comments
+                    if (isAdmin(user)) {
+                        const commentsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'peerPosts', postId, 'comments'));
+                        for (const commentDoc of commentsSnapshot.docs) {
+                            await deleteDoc(doc(db, 'artifacts', appId, 'peerPosts', postId, 'comments', commentDoc.id));
+                        }
+                    }
                     await deleteDoc(doc(db, 'artifacts', appId, 'peerPosts', postId));
                     setDeleteConfirm(null);
                     setSelectedPostId(null);
@@ -2610,6 +2626,7 @@ Respond with ONLY the JSON object, nothing else.`
                 const typeInfo = getPostTypeInfo(selectedPost.type);
                 const hasLiked = selectedPost.likes?.includes(user?.uid);
                 const isAuthor = selectedPost.authorId === user?.uid;
+                const canModerate = isAuthor || isAdmin(user); // Admin can also moderate
 
                 return (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center sm:p-4" onClick={() => setSelectedPostId(null)}>
@@ -2634,24 +2651,25 @@ Respond with ONLY the JSON object, nothing else.`
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                        {/* Edit & Delete buttons - only for post author */}
+                                        {/* Edit button - only for author */}
                                         {isAuthor && (
-                                            <>
-                                                <button 
-                                                    onClick={() => { setSelectedPostId(null); openEditPost(selectedPost); }}
-                                                    className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-400 hover:text-indigo-400' : 'hover:bg-slate-100 text-slate-500 hover:text-indigo-600'}`}
-                                                    title="Edit post"
-                                                >
-                                                    <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => setDeleteConfirm(selectedPost)}
-                                                    className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all ${theme === 'dark' ? 'hover:bg-rose-500/20 text-slate-400 hover:text-rose-400' : 'hover:bg-rose-50 text-slate-500 hover:text-rose-600'}`}
-                                                    title="Delete post"
-                                                >
-                                                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                                                </button>
-                                            </>
+                                            <button 
+                                                onClick={() => { setSelectedPostId(null); openEditPost(selectedPost); }}
+                                                className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-400 hover:text-indigo-400' : 'hover:bg-slate-100 text-slate-500 hover:text-indigo-600'}`}
+                                                title="Edit post"
+                                            >
+                                                <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                                            </button>
+                                        )}
+                                        {/* Delete button - for author or admin */}
+                                        {canModerate && (
+                                            <button 
+                                                onClick={() => setDeleteConfirm(selectedPost)}
+                                                className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all ${theme === 'dark' ? 'hover:bg-rose-500/20 text-slate-400 hover:text-rose-400' : 'hover:bg-rose-50 text-slate-500 hover:text-rose-600'}`}
+                                                title={isAdmin(user) && !isAuthor ? "Delete post (Admin)" : "Delete post"}
+                                            >
+                                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                            </button>
                                         )}
                                         <button onClick={() => setSelectedPostId(null)} className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
                                             <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -5490,6 +5508,516 @@ Respond with ONLY the JSON object, nothing else.`
             );
         };
 
+        // --- ADMIN PANEL COMPONENT ---
+        const AdminPanel = ({ user, theme }) => {
+            const [activeSection, setActiveSection] = useState('posts'); // 'posts', 'users', 'messages'
+            const [allPosts, setAllPosts] = useState([]);
+            const [allUsers, setAllUsers] = useState([]);
+            const [allConversations, setAllConversations] = useState([]);
+            const [selectedConversation, setSelectedConversation] = useState(null);
+            const [conversationMessages, setConversationMessages] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [deleteConfirm, setDeleteConfirm] = useState(null);
+            const [isDeleting, setIsDeleting] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [userToDelete, setUserToDelete] = useState(null);
+            const [isDeletingUser, setIsDeletingUser] = useState(false);
+
+            // Theme styles
+            const panelBg = theme === 'dark' ? 'bg-slate-800/50' : 'bg-white';
+            const cardBg = theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50';
+            const textMain = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-slate-400' : 'text-slate-500';
+            const borderColor = theme === 'dark' ? 'border-slate-700' : 'border-slate-200';
+            const inputBg = theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800';
+
+            // Check if user is admin
+            if (!isAdmin(user)) {
+                return (
+                    <div className="pt-44 px-4 text-center">
+                        <Shield className="w-16 h-16 mx-auto text-red-500 mb-4" />
+                        <h2 className={`text-2xl font-bold ${textMain}`}>Access Denied</h2>
+                        <p className={textSub}>You don't have permission to access this page.</p>
+                    </div>
+                );
+            }
+
+            // Load all posts
+            useEffect(() => {
+                const q = query(collection(db, 'artifacts', appId, 'peerPosts'), orderBy('createdAt', 'desc'));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setAllPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // Load all users
+            useEffect(() => {
+                const unsubscribe = onSnapshot(
+                    collection(db, 'artifacts', appId, 'chatUsers'),
+                    (snapshot) => {
+                        setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    }
+                );
+                return () => unsubscribe();
+            }, []);
+
+            // Load all conversations
+            useEffect(() => {
+                const unsubscribe = onSnapshot(
+                    collection(db, 'artifacts', appId, 'conversations'),
+                    async (snapshot) => {
+                        const convos = await Promise.all(snapshot.docs.map(async (docSnap) => {
+                            const data = docSnap.data();
+                            // Get participant info
+                            const participants = await Promise.all(data.participants?.map(async (uid) => {
+                                try {
+                                    const userDoc = await getDoc(doc(db, 'artifacts', appId, 'chatUsers', uid));
+                                    return userDoc.exists() ? { uid, ...userDoc.data() } : { uid, displayName: 'Unknown' };
+                                } catch {
+                                    return { uid, displayName: 'Unknown' };
+                                }
+                            }) || []);
+                            return { id: docSnap.id, ...data, participantInfo: participants };
+                        }));
+                        convos.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+                        setAllConversations(convos);
+                    }
+                );
+                return () => unsubscribe();
+            }, []);
+
+            // Load messages for selected conversation
+            useEffect(() => {
+                if (!selectedConversation) {
+                    setConversationMessages([]);
+                    return;
+                }
+                const q = query(
+                    collection(db, 'artifacts', appId, 'conversations', selectedConversation.id, 'messages'),
+                    orderBy('timestamp', 'asc')
+                );
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setConversationMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
+                return () => unsubscribe();
+            }, [selectedConversation]);
+
+            // Delete post (admin)
+            const handleDeletePost = async (postId) => {
+                setIsDeleting(true);
+                try {
+                    // Delete all comments first
+                    const commentsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'peerPosts', postId, 'comments'));
+                    for (const commentDoc of commentsSnapshot.docs) {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'peerPosts', postId, 'comments', commentDoc.id));
+                    }
+                    // Delete the post
+                    await deleteDoc(doc(db, 'artifacts', appId, 'peerPosts', postId));
+                    setDeleteConfirm(null);
+                } catch (err) {
+                    console.error('Error deleting post:', err);
+                }
+                setIsDeleting(false);
+            };
+
+            // Delete user data (Firestore only - Firebase Auth deletion requires Cloud Functions)
+            const handleDeleteUserData = async (userId) => {
+                setIsDeletingUser(true);
+                try {
+                    // Delete user's posts
+                    const userPosts = allPosts.filter(p => p.authorId === userId);
+                    for (const post of userPosts) {
+                        const commentsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'peerPosts', post.id, 'comments'));
+                        for (const commentDoc of commentsSnapshot.docs) {
+                            await deleteDoc(doc(db, 'artifacts', appId, 'peerPosts', post.id, 'comments', commentDoc.id));
+                        }
+                        await deleteDoc(doc(db, 'artifacts', appId, 'peerPosts', post.id));
+                    }
+
+                    // Delete user's vocabulary
+                    const vocabSnapshot = await getDocs(collection(db, 'artifacts', appId, 'users', userId, 'vocabulary'));
+                    for (const vocabDoc of vocabSnapshot.docs) {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'vocabulary', vocabDoc.id));
+                    }
+
+                    // Delete user's metadata
+                    try {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'metadata', 'stats'));
+                    } catch {}
+
+                    // Delete from chatUsers
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', userId));
+
+                    // Delete user profile
+                    try {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'info'));
+                    } catch {}
+
+                    setUserToDelete(null);
+                    alert('User data deleted from Firestore. Note: To fully delete the Firebase Auth account, you need to use Firebase Admin SDK via Cloud Functions.');
+                } catch (err) {
+                    console.error('Error deleting user data:', err);
+                    alert('Error deleting user data: ' + err.message);
+                }
+                setIsDeletingUser(false);
+            };
+
+            // Delete a specific message
+            const handleDeleteMessage = async (messageId) => {
+                if (!selectedConversation) return;
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'conversations', selectedConversation.id, 'messages', messageId));
+                } catch (err) {
+                    console.error('Error deleting message:', err);
+                }
+            };
+
+            const formatTime = (timestamp) => {
+                if (!timestamp) return '';
+                const date = new Date(timestamp);
+                return date.toLocaleString();
+            };
+
+            // Filter posts/users based on search
+            const filteredPosts = allPosts.filter(post => 
+                post.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                post.authorName?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            const filteredUsers = allUsers.filter(u => 
+                u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            return (
+                <div className="pt-44 pb-12 px-4 max-w-6xl mx-auto">
+                    {/* Header */}
+                    <div className="mb-8">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
+                                <Shield className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h1 className={`text-3xl font-black ${textMain}`}>Admin Panel</h1>
+                                <p className={textSub}>Manage posts, users, and messages</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section Tabs */}
+                    <div className={`flex gap-2 p-1.5 rounded-2xl ${cardBg} mb-6`}>
+                        {[
+                            { id: 'posts', label: 'Posts', icon: FileText, count: allPosts.length },
+                            { id: 'users', label: 'Users', icon: Users, count: allUsers.length },
+                            { id: 'messages', label: 'Messages', icon: Mail, count: allConversations.length }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => { setActiveSection(tab.id); setSearchQuery(''); setSelectedConversation(null); }}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all ${
+                                    activeSection === tab.id
+                                        ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg'
+                                        : `${textSub} hover:bg-white/10`
+                                }`}
+                            >
+                                <tab.icon className="w-4 h-4" />
+                                {tab.label}
+                                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                    activeSection === tab.id ? 'bg-white/20' : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'
+                                }`}>{tab.count}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Search Bar */}
+                    {activeSection !== 'messages' && (
+                        <div className="mb-6">
+                            <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${inputBg}`}>
+                                <Search className={`w-5 h-5 ${textSub}`} />
+                                <input
+                                    type="text"
+                                    placeholder={`Search ${activeSection}...`}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="flex-1 bg-transparent outline-none"
+                                />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className={textSub}>
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* POSTS SECTION */}
+                    {activeSection === 'posts' && (
+                        <div className="space-y-4">
+                            {loading ? (
+                                <div className="text-center py-12">
+                                    <Loader2 className={`w-8 h-8 animate-spin mx-auto ${textSub}`} />
+                                </div>
+                            ) : filteredPosts.length === 0 ? (
+                                <div className={`text-center py-12 ${textSub}`}>
+                                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                    <p>No posts found</p>
+                                </div>
+                            ) : (
+                                filteredPosts.map(post => (
+                                    <div key={post.id} className={`${panelBg} rounded-2xl border ${borderColor} p-4`}>
+                                        <div className="flex items-start gap-3">
+                                            {post.authorPhoto ? (
+                                                <img src={post.authorPhoto} className="w-10 h-10 rounded-full" alt="" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold">
+                                                    {post.authorName?.charAt(0) || '?'}
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`font-bold ${textMain}`}>{post.authorName}</span>
+                                                    <span className={`text-xs ${textSub}`}>({post.authorId?.slice(0, 8)}...)</span>
+                                                    <span className={`text-xs ${textSub}`}>{formatTime(post.createdAt)}</span>
+                                                </div>
+                                                <p className={`mt-1 ${textMain}`}>{post.content}</p>
+                                                <div className={`flex items-center gap-4 mt-2 text-xs ${textSub}`}>
+                                                    <span>❤️ {post.likeCount || 0}</span>
+                                                    <span>💬 {post.commentCount || 0}</span>
+                                                    <span>👁️ {post.viewCount || 0}</span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => setDeleteConfirm(post)}
+                                                className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+
+                    {/* USERS SECTION */}
+                    {activeSection === 'users' && (
+                        <div className="space-y-4">
+                            {filteredUsers.length === 0 ? (
+                                <div className={`text-center py-12 ${textSub}`}>
+                                    <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                    <p>No users found</p>
+                                </div>
+                            ) : (
+                                filteredUsers.map(u => (
+                                    <div key={u.id} className={`${panelBg} rounded-2xl border ${borderColor} p-4`}>
+                                        <div className="flex items-center gap-3">
+                                            {u.photoURL ? (
+                                                <img src={u.photoURL} className="w-12 h-12 rounded-full" alt="" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-lg">
+                                                    {u.displayName?.charAt(0) || '?'}
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className={`font-bold ${textMain}`}>{u.displayName}</div>
+                                                <div className={`text-sm ${textSub}`}>{u.email}</div>
+                                                <div className={`text-xs ${textSub} mt-1`}>
+                                                    UID: {u.uid?.slice(0, 20)}...
+                                                    {u.lastSeen && ` • Last seen: ${formatTime(u.lastSeen)}`}
+                                                </div>
+                                            </div>
+                                            {u.email !== ADMIN_EMAIL && (
+                                                <button
+                                                    onClick={() => setUserToDelete(u)}
+                                                    className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                                                    title="Delete user data"
+                                                >
+                                                    <Ban className="w-5 h-5" />
+                                                </button>
+                                            )}
+                                            {u.email === ADMIN_EMAIL && (
+                                                <span className="px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold">
+                                                    ADMIN
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+
+                    {/* MESSAGES SECTION */}
+                    {activeSection === 'messages' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            {/* Conversations List */}
+                            <div className={`${panelBg} rounded-2xl border ${borderColor} overflow-hidden lg:col-span-1`}>
+                                <div className={`p-4 border-b ${borderColor}`}>
+                                    <h3 className={`font-bold ${textMain}`}>All Conversations</h3>
+                                    <p className={`text-xs ${textSub}`}>{allConversations.length} total</p>
+                                </div>
+                                <div className="max-h-96 overflow-y-auto">
+                                    {allConversations.map(convo => (
+                                        <button
+                                            key={convo.id}
+                                            onClick={() => setSelectedConversation(convo)}
+                                            className={`w-full p-3 text-left border-b ${borderColor} transition-colors ${
+                                                selectedConversation?.id === convo.id
+                                                    ? theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-50'
+                                                    : 'hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <div className={`font-medium text-sm ${textMain} truncate`}>
+                                                {convo.participantInfo?.map(p => p.displayName).join(' ↔ ')}
+                                            </div>
+                                            <div className={`text-xs ${textSub} truncate mt-1`}>
+                                                {convo.lastMessage || 'No messages'}
+                                            </div>
+                                            <div className={`text-xs ${textSub} mt-1`}>
+                                                {formatTime(convo.lastMessageTime)}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Messages View */}
+                            <div className={`${panelBg} rounded-2xl border ${borderColor} overflow-hidden lg:col-span-2`}>
+                                {selectedConversation ? (
+                                    <>
+                                        <div className={`p-4 border-b ${borderColor} flex items-center justify-between`}>
+                                            <div>
+                                                <h3 className={`font-bold ${textMain}`}>
+                                                    {selectedConversation.participantInfo?.map(p => p.displayName).join(' ↔ ')}
+                                                </h3>
+                                                <p className={`text-xs ${textSub}`}>{conversationMessages.length} messages</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setSelectedConversation(null)}
+                                                className={`p-2 rounded-lg ${textSub} hover:bg-white/10`}
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        <div className="max-h-96 overflow-y-auto p-4 space-y-3">
+                                            {conversationMessages.map(msg => (
+                                                <div key={msg.id} className={`${cardBg} rounded-xl p-3`}>
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`font-bold text-sm ${textMain}`}>{msg.senderName}</span>
+                                                                <span className={`text-xs ${textSub}`}>{formatTime(msg.timestamp)}</span>
+                                                            </div>
+                                                            <p className={`text-sm mt-1 ${textMain}`}>{msg.text}</p>
+                                                            {msg.imageUrl && (
+                                                                <img src={msg.imageUrl} className="mt-2 max-w-xs rounded-lg" alt="" />
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleDeleteMessage(msg.id)}
+                                                            className="p-1.5 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {conversationMessages.length === 0 && (
+                                                <div className={`text-center py-8 ${textSub}`}>
+                                                    <Mail className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                                    <p>No messages in this conversation</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className={`flex flex-col items-center justify-center h-64 ${textSub}`}>
+                                        <Mail className="w-12 h-12 mb-3 opacity-50" />
+                                        <p>Select a conversation to view messages</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Delete Post Confirmation Modal */}
+                    {deleteConfirm && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
+                            <div className={`${panelBg} rounded-3xl max-w-md w-full p-6 border ${borderColor}`} onClick={e => e.stopPropagation()}>
+                                <div className="text-center">
+                                    <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                                        <AlertCircle className="w-8 h-8 text-red-500" />
+                                    </div>
+                                    <h3 className={`text-xl font-bold ${textMain} mb-2`}>Delete Post?</h3>
+                                    <p className={`${textSub} mb-6`}>
+                                        This will permanently delete the post by <strong>{deleteConfirm.authorName}</strong> and all its comments. This action cannot be undone.
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setDeleteConfirm(null)}
+                                            className={`flex-1 py-3 rounded-xl font-bold ${theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeletePost(deleteConfirm.id)}
+                                            disabled={isDeleting}
+                                            className="flex-1 py-3 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Delete User Confirmation Modal */}
+                    {userToDelete && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setUserToDelete(null)}>
+                            <div className={`${panelBg} rounded-3xl max-w-md w-full p-6 border ${borderColor}`} onClick={e => e.stopPropagation()}>
+                                <div className="text-center">
+                                    <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                                        <Ban className="w-8 h-8 text-red-500" />
+                                    </div>
+                                    <h3 className={`text-xl font-bold ${textMain} mb-2`}>Delete User Data?</h3>
+                                    <p className={`${textSub} mb-2`}>
+                                        This will permanently delete all data for:
+                                    </p>
+                                    <div className={`${cardBg} rounded-xl p-3 mb-4`}>
+                                        <div className={`font-bold ${textMain}`}>{userToDelete.displayName}</div>
+                                        <div className={`text-sm ${textSub}`}>{userToDelete.email}</div>
+                                    </div>
+                                    <p className={`text-xs ${textSub} mb-6`}>
+                                        This includes: posts, vocabulary, profile, and chat data. The Firebase Auth account will remain (use Cloud Functions to delete it completely).
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setUserToDelete(null)}
+                                            className={`flex-1 py-3 rounded-xl font-bold ${theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteUserData(userToDelete.uid)}
+                                            disabled={isDeletingUser}
+                                            className="flex-1 py-3 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            {isDeletingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                                            Delete Data
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         const App = () => {
             const [user, setUser] = useState(null);
             const [items, setItems] = useState([]);
@@ -5775,6 +6303,7 @@ Respond with ONLY the JSON object, nothing else.`
                         {activeTab === 'dashboard' && ( <Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} /> )}
                         {activeTab === 'mylearning' && ( <MyLearning items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} user={user} onShareToPeers={handleShareToPeers} /> )}
                         {activeTab === 'peers' && ( <Peers user={user} theme={theme} /> )}
+                        {activeTab === 'admin' && ( <AdminPanel user={user} theme={theme} /> )}
                     </main>
                     {reviewQueue && ( <ReviewSession dueItems={reviewQueue} mode={reviewMode} onClose={() => setReviewQueue(null)} onComplete={handleUpdateSRS} theme={theme} /> )}
                     
