@@ -1,8 +1,9 @@
-const CACHE_NAME = 'bureaucratis-v1';
+const CACHE_NAME = 'bureaucratis-v2';
 const urlsToCache = [
   './',
   './index.html',
-  './2.jpg',
+  './icon-192.png',
+  './icon-512.png',
   './manifest.json'
 ];
 

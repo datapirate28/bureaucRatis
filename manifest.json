@@ -1,4 +1,5 @@
 {
+  "id": "bureaucratis-pwa",
   "name": "bureaucRatis",
   "short_name": "bureaucRatis",
   "description": "Your vocabulary learning companion with spaced repetition",
@@ -10,16 +11,28 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "./2.jpg",
+      "src": "./icon-192.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "./2.jpg",
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["education", "productivity"],
