@@ -3180,48 +3180,6 @@ Respond with ONLY the JSON object, nothing else.`
                                         </div>
                                     )}
 
-                                    {/* Remove Friend Modal */}
-                                    {showRemoveFriendModal && friendToRemove && (
-                                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-3xl" onClick={() => { setShowRemoveFriendModal(false); setFriendToRemove(null); }}>
-                                            <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl w-80 animate-in zoom-in-95`} onClick={e => e.stopPropagation()}>
-                                                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-                                                    <UserMinus className="w-6 h-6 text-red-500" />
-                                                </div>
-                                                <h3 className={`text-lg font-bold mb-2 text-center ${textMain}`}>Remove Friend?</h3>
-                                                <div className="flex items-center justify-center gap-3 mb-4">
-                                                    {friendToRemove.photoURL ? (
-                                                        <img src={friendToRemove.photoURL} className="w-12 h-12 rounded-full border-2 border-white/20" alt="" />
-                                                    ) : (
-                                                        <div className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
-                                                            <User className="w-6 h-6 text-indigo-500" />
-                                                        </div>
-                                                    )}
-                                                    <span className={`font-bold ${textMain}`}>{friendToRemove.displayName}</span>
-                                                </div>
-                                                <p className={`text-sm mb-4 text-center ${textSub}`}>
-                                                    Are you sure you want to remove this friend? You can add them back later.
-                                                </p>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => { setShowRemoveFriendModal(false); setFriendToRemove(null); }}
-                                                        disabled={isRemovingFriend}
-                                                        className={`flex-1 py-2.5 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} disabled:opacity-50`}
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                    <button
-                                                        onClick={removeFriend}
-                                                        disabled={isRemovingFriend}
-                                                        className="flex-1 py-2.5 rounded-xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                                    >
-                                                        {isRemovingFriend ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserMinus className="w-4 h-4" />}
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {/* Messages */}
                                     <div className="flex-1 overflow-y-auto p-4 space-y-3 messenger-scroll">
                                         {messages.length === 0 ? (
@@ -3435,6 +3393,48 @@ Respond with ONLY the JSON object, nothing else.`
                                 </div>
                             )}
                         </div>
+
+                        {/* Remove Friend Modal - At messenger level so it works from Friends tab */}
+                        {showRemoveFriendModal && friendToRemove && (
+                            <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-3xl" onClick={() => { setShowRemoveFriendModal(false); setFriendToRemove(null); }}>
+                                <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl w-80 animate-in zoom-in-95`} onClick={e => e.stopPropagation()}>
+                                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                                        <UserMinus className="w-6 h-6 text-red-500" />
+                                    </div>
+                                    <h3 className={`text-lg font-bold mb-2 text-center ${textMain}`}>Remove Friend?</h3>
+                                    <div className="flex items-center justify-center gap-3 mb-4">
+                                        {friendToRemove.photoURL ? (
+                                            <img src={friendToRemove.photoURL} className="w-12 h-12 rounded-full border-2 border-white/20" alt="" />
+                                        ) : (
+                                            <div className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                                <User className="w-6 h-6 text-indigo-500" />
+                                            </div>
+                                        )}
+                                        <span className={`font-bold ${textMain}`}>{friendToRemove.displayName}</span>
+                                    </div>
+                                    <p className={`text-sm mb-4 text-center ${textSub}`}>
+                                        Are you sure you want to remove this friend? You can add them back later.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => { setShowRemoveFriendModal(false); setFriendToRemove(null); }}
+                                            disabled={isRemovingFriend}
+                                            className={`flex-1 py-2.5 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} disabled:opacity-50`}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={removeFriend}
+                                            disabled={isRemovingFriend}
+                                            className="flex-1 py-2.5 rounded-xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {isRemovingFriend ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserMinus className="w-4 h-4" />}
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             );
