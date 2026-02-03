@@ -157,6 +157,35 @@
         .messenger-scroll::-webkit-scrollbar-thumb:hover {
             background: rgba(99, 102, 241, 0.5);
         }
+
+        /* Peers Post Animations */
+        @keyframes likeHeart {
+            0% { transform: scale(1); }
+            25% { transform: scale(1.3); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        .animate-like-heart {
+            animation: likeHeart 0.4s ease-out;
+        }
+
+        @keyframes postSlideIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-post-in {
+            animation: postSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .animate-shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
     </style>
 </head>
 <body class="font-sans overflow-x-hidden transition-colors duration-500">
@@ -182,7 +211,7 @@
             LogOut, ShieldCheck, LogIn, ChevronDown, Play, ArrowLeft, Trophy, 
             Book, Mic, Volume2, Wand2, Star, ChevronRight, Activity, Grid, List,
             Moon, Sun, Upload, Pencil, Send, Users, MessageSquare, Circle, Heart, UserPlus, UserMinus, UserCheck,
-            CheckCheck, Image as ImageIcon, MessagesSquare, Share2, Inbox, Gift, Package, FileText, ExternalLink
+            CheckCheck, Image as ImageIcon, MessagesSquare, Share2, Inbox, Gift, Package, FileText, ExternalLink, Eye
         } from 'lucide-react';
         
         // Import Firebase
@@ -283,7 +312,7 @@
 
         // --- COMPONENTS ---
 
-        const ItemCard = ({ title, subtitle, icon: Icon, colorClass, onDelete, onSpeak, onEdit, interval, type, theme, sharedBy }) => {
+        const ItemCard = ({ title, subtitle, icon: Icon, colorClass, onDelete, onSpeak, onEdit, onShare, interval, type, theme, sharedBy }) => {
             const gradients = {
                 voca: "from-indigo-500 to-blue-500",
                 synonym: "from-violet-500 to-purple-500",
@@ -334,6 +363,11 @@
                         {onSpeak && (
                             <button onClick={onSpeak} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
                                 <Volume2 className="w-5 h-5" />
+                            </button>
+                        )}
+                        {onShare && (
+                            <button onClick={onShare} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-500 hover:text-emerald-600'}`} title="Share to Peers">
+                                <Share2 className="w-5 h-5" />
                             </button>
                         )}
                         {onEdit && (
@@ -441,10 +475,8 @@
         const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages, setIsShareModalOpen, setIsSharingInboxOpen, shareRequestCount }) => {
             const navItems = [
                 { id: 'dashboard', label: 'Dashboard', icon: Grid },
-                { id: 'voca', label: 'Vocab', icon: Book }, // Changed from "Voca" to "Vocab"
-                { id: 'synonyms', label: 'Synonyms', icon: LinkIcon },
-                { id: 'antonyms', label: 'Antonyms', icon: ArrowLeftRight },
-                { id: 'phrases', label: 'Phrases', icon: MessageCircle },
+                { id: 'mylearning', label: 'My Learning', icon: Book },
+                { id: 'peers', label: 'Peers', icon: Users },
             ];
             const level = Math.floor((items?.length || 0) / 5) + 1;
             
@@ -562,79 +594,65 @@
                     {/* Floating Icons - Left side horizontal, Right side theme toggle */}
                     <div className="fixed top-24 left-0 right-0 z-40 px-4 md:px-8">
                         <div className="max-w-6xl mx-auto flex justify-between items-start px-2 sm:px-6">
-                            {/* Left Side - Messenger with expandable icons (horizontal) */}
-                            <div ref={iconsContainerRef} className="flex flex-row items-center gap-2 group/icons">
-                                {/* Messenger Button - Always visible */}
-                                <div className="animate-slide-up delay-300">
-                                    <button 
-                                        onClick={handleMessengerClick}
-                                        className={`relative p-2 sm:p-2.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
-                                            theme === 'dark' 
-                                                ? 'bg-gradient-to-br from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500' 
-                                                : 'bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400'
-                                        }`}
-                                        title={iconsExpanded ? "Open Messages" : "Tap to expand options"}
-                                    >
-                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="sm:w-[26px] sm:h-[26px] transition-transform hover:scale-110">
-                                            {/* Modern chat bubble */}
-                                            <path d="M12 3C7.03 3 3 6.58 3 11C3 13.39 4.32 15.5 6.4 16.83L5 21L9.73 18.76C10.47 18.91 11.23 19 12 19C16.97 19 21 15.42 21 11C21 6.58 16.97 3 12 3Z" fill="white" fillOpacity="0.95"/>
-                                            {/* Typing dots */}
-                                            <circle cx="8" cy="11" r="1.5" fill="#6366f1"/>
-                                            <circle cx="12" cy="11" r="1.5" fill="#8b5cf6"/>
-                                            <circle cx="16" cy="11" r="1.5" fill="#a855f7"/>
-                                        </svg>
-                                        {/* Notification Badge */}
-                                        {totalUnreadMessages > 0 && (
-                                            <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 min-w-[18px] h-[18px] sm:min-w-[20px] sm:h-[20px] px-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center shadow-md border-2 border-white animate-pulse">
-                                                {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
-                                            </span>
-                                        )}
-                                    </button>
-                                </div>
+                            {/* Left Side - Icons displayed horizontally */}
+                            <div ref={iconsContainerRef} className="flex flex-row items-center gap-2">
+                                {/* Messenger Button */}
+                                <button 
+                                    onClick={handleMessengerClick}
+                                    className={`relative p-2.5 rounded-xl shadow-md transition-all duration-200 ease-out hover:scale-110 hover:shadow-lg active:scale-95 ${
+                                        theme === 'dark' 
+                                            ? 'bg-gradient-to-br from-indigo-500 to-violet-600' 
+                                            : 'bg-gradient-to-br from-indigo-500 to-violet-500'
+                                    }`}
+                                    title="Open Messages"
+                                >
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        {/* Modern chat bubble */}
+                                        <path d="M12 3C7.03 3 3 6.58 3 11C3 13.39 4.32 15.5 6.4 16.83L5 21L9.73 18.76C10.47 18.91 11.23 19 12 19C16.97 19 21 15.42 21 11C21 6.58 16.97 3 12 3Z" fill="white" fillOpacity="0.95"/>
+                                        {/* Typing dots */}
+                                        <circle cx="8" cy="11" r="1.5" fill="#6366f1"/>
+                                        <circle cx="12" cy="11" r="1.5" fill="#8b5cf6"/>
+                                        <circle cx="16" cy="11" r="1.5" fill="#a855f7"/>
+                                    </svg>
+                                    {/* Notification Badge */}
+                                    {totalUnreadMessages > 0 && (
+                                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-md border-2 border-white">
+                                            {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+                                        </span>
+                                    )}
+                                </button>
 
-                                {/* Share Button - Hidden by default, shows on hover (desktop) or tap (mobile) */}
-                                <div className={`transition-all duration-300 ease-out delay-75 ${
-                                    iconsExpanded 
-                                        ? 'opacity-100 translate-x-0 scale-100' 
-                                        : 'opacity-0 -translate-x-2 scale-90 pointer-events-none sm:pointer-events-auto sm:group-hover/icons:opacity-100 sm:group-hover/icons:translate-x-0 sm:group-hover/icons:scale-100'
-                                }`}>
-                                    <button 
-                                        onClick={handleShareClick}
-                                        className={`relative p-2 sm:p-2.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
-                                            theme === 'dark' 
-                                                ? 'bg-gradient-to-br from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 border border-white/10' 
-                                                : 'bg-gradient-to-br from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400'
-                                        }`}
-                                        title="Share Vocabulary"
-                                    >
-                                        <Share2 className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
-                                    </button>
-                                </div>
+                                {/* Share Button */}
+                                <button 
+                                    onClick={handleShareClick}
+                                    className={`relative p-2.5 rounded-xl shadow-md transition-all duration-200 ease-out hover:scale-110 hover:shadow-lg active:scale-95 ${
+                                        theme === 'dark' 
+                                            ? 'bg-gradient-to-br from-emerald-600 to-teal-600 border border-white/10' 
+                                            : 'bg-gradient-to-br from-emerald-500 to-teal-500'
+                                    }`}
+                                    title="Share Vocabulary"
+                                >
+                                    <Share2 className="w-[22px] h-[22px] text-white" />
+                                </button>
 
-                                {/* Sharing Inbox Button - Hidden by default, shows on hover (desktop) or tap (mobile) */}
-                                <div className={`transition-all duration-300 ease-out delay-150 ${
-                                    iconsExpanded 
-                                        ? 'opacity-100 translate-x-0 scale-100' 
-                                        : 'opacity-0 -translate-x-2 scale-90 pointer-events-none sm:pointer-events-auto sm:group-hover/icons:opacity-100 sm:group-hover/icons:translate-x-0 sm:group-hover/icons:scale-100'
-                                }`}>
-                                    <button 
-                                        onClick={handleInboxClick}
-                                        className={`relative p-2 sm:p-2.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
-                                            theme === 'dark' 
-                                                ? 'bg-gradient-to-br from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 border border-white/10' 
-                                                : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400'
-                                        }`}
-                                        title="Sharing Inbox"
-                                    >
-                                        <Inbox className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
-                                        {/* Notification Badge - Always visible when there are requests */}
-                                        {shareRequestCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 min-w-[18px] h-[18px] sm:min-w-[20px] sm:h-[20px] px-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center shadow-md border-2 border-white animate-pulse">
-                                                {shareRequestCount > 99 ? '99+' : shareRequestCount}
-                                            </span>
-                                        )}
-                                    </button>
-                                </div>
+                                {/* Sharing Inbox Button */}
+                                <button 
+                                    onClick={handleInboxClick}
+                                    className={`relative p-2.5 rounded-xl shadow-md transition-all duration-200 ease-out hover:scale-110 hover:shadow-lg active:scale-95 ${
+                                        theme === 'dark' 
+                                            ? 'bg-gradient-to-br from-amber-600 to-orange-600 border border-white/10' 
+                                            : 'bg-gradient-to-br from-amber-500 to-orange-500'
+                                    }`}
+                                    title="Sharing Inbox"
+                                >
+                                    <Inbox className="w-[22px] h-[22px] text-white" />
+                                    {/* Notification Badge */}
+                                    {shareRequestCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-md border-2 border-white">
+                                            {shareRequestCount > 99 ? '99+' : shareRequestCount}
+                                        </span>
+                                    )}
+                                </button>
                             </div>
 
                             {/* Right Side - Theme Toggle */}
@@ -1754,6 +1772,1291 @@ Respond with ONLY the JSON object, nothing else.`
                     }>
                         <div className="grid grid-cols-1 gap-5">{phraseItems.map(item => (<ItemCard key={item.id} type="phrase" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>} icon={MessageCircle} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} interval={item.interval} sharedBy={item.sharedBy} />))}</div>
                     </ManagerContainer>
+                </div>
+            );
+        };
+
+        // --- MY LEARNING - UNIFIED COMPONENT ---
+        const MyLearning = ({ items, onAdd, onDelete, onDeleteAll, onUpdate, theme, user, onShareToPeers }) => {
+            const [activeCategory, setActiveCategory] = useState('voca');
+            
+            // Edit modal states
+            const [editingItem, setEditingItem] = useState(null);
+            const [editFormData, setEditFormData] = useState({});
+            
+            // Share confirmation state
+            const [shareConfirm, setShareConfirm] = useState(null);
+            
+            const categories = [
+                { id: 'voca', label: 'Vocabulary', icon: Book, color: 'from-indigo-500 to-blue-500', count: items.filter(i => i.type === 'voca').length },
+                { id: 'synonym', label: 'Synonyms', icon: LinkIcon, color: 'from-violet-500 to-purple-500', count: items.filter(i => i.type === 'synonym').length },
+                { id: 'antonym', label: 'Antonyms', icon: ArrowLeftRight, color: 'from-rose-500 to-pink-500', count: items.filter(i => i.type === 'antonym').length },
+                { id: 'phrase', label: 'Phrases', icon: MessageCircle, color: 'from-amber-400 to-orange-500', count: items.filter(i => i.type === 'phrase').length },
+            ];
+
+            const cardBg = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
+            const textColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-gray-400' : 'text-slate-500';
+            const inputClass = theme === 'dark' 
+                ? 'bg-slate-950/50 border border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-inner backdrop-blur-sm' 
+                : 'bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 shadow-sm';
+            const labelClass = theme === 'dark' ? 'text-slate-400 font-bold' : 'text-slate-500 font-bold';
+
+            // Form states for inline Add forms
+            const [vocaForm, setVocaForm] = useState({ word: '', pos: 'noun', ipa: '', definition: '', example: '', collocations: '' });
+            const [synonymForm, setSynonymForm] = useState({ word: '', synonyms: '' });
+            const [antonymForm, setAntonymForm] = useState({ wordA: '', wordB: '' });
+            const [phraseForm, setPhraseForm] = useState({ phrase: '', context: '' });
+            
+            // Dropdown visibility state for add forms
+            const [showAddForm, setShowAddForm] = useState(false);
+            
+            // Share message state
+            const [shareMessage, setShareMessage] = useState('');
+
+            // Add handlers
+            const handleVocaSubmit = (e) => {
+                e.preventDefault();
+                if (!vocaForm.word.trim()) return;
+                onAdd({ type: 'voca', mainText: vocaForm.word, context: vocaForm.definition, pos: vocaForm.pos, ipa: vocaForm.ipa, example: vocaForm.example, collocations: vocaForm.collocations, easiness: 2.5, interval: 0, nextReview: Date.now() });
+                setVocaForm({ word: '', pos: 'noun', ipa: '', definition: '', example: '', collocations: '' });
+            };
+
+            const handleSynonymSubmit = (e) => {
+                e.preventDefault();
+                if (!synonymForm.word.trim()) return;
+                const synList = synonymForm.synonyms.split(',').map(s => s.trim()).filter(s => s);
+                onAdd({ type: 'synonym', mainText: synonymForm.word, related: synList, easiness: 2.5, interval: 0, nextReview: Date.now() });
+                setSynonymForm({ word: '', synonyms: '' });
+            };
+
+            const handleAntonymSubmit = (e) => {
+                e.preventDefault();
+                if (!antonymForm.wordA.trim() || !antonymForm.wordB.trim()) return;
+                onAdd({ type: 'antonym', mainText: antonymForm.wordA, related: [antonymForm.wordB], easiness: 2.5, interval: 0, nextReview: Date.now() });
+                setAntonymForm({ wordA: '', wordB: '' });
+            };
+
+            const handlePhraseSubmit = (e) => {
+                e.preventDefault();
+                if (!phraseForm.phrase.trim()) return;
+                onAdd({ type: 'phrase', mainText: phraseForm.phrase, context: phraseForm.context, easiness: 2.5, interval: 0, nextReview: Date.now() });
+                setPhraseForm({ phrase: '', context: '' });
+            };
+
+            // Edit handlers
+            const openEditModal = (item) => {
+                setEditingItem(item);
+                if (item.type === 'voca') {
+                    setEditFormData({ word: item.mainText, pos: item.pos || 'noun', ipa: item.ipa || '', definition: item.context || '', example: item.example || '', collocations: item.collocations || '' });
+                } else if (item.type === 'synonym') {
+                    setEditFormData({ word: item.mainText, synonyms: item.related?.join(', ') || '' });
+                } else if (item.type === 'antonym') {
+                    setEditFormData({ wordA: item.mainText, wordB: item.related?.[0] || '' });
+                } else if (item.type === 'phrase') {
+                    setEditFormData({ phrase: item.mainText, context: item.context || '' });
+                }
+            };
+
+            const handleEditSubmit = (e) => {
+                e.preventDefault();
+                if (!editingItem) return;
+                
+                if (editingItem.type === 'voca') {
+                    onUpdate(editingItem.id, { mainText: editFormData.word, context: editFormData.definition, pos: editFormData.pos, ipa: editFormData.ipa, example: editFormData.example, collocations: editFormData.collocations });
+                } else if (editingItem.type === 'synonym') {
+                    const synList = editFormData.synonyms.split(',').map(s => s.trim()).filter(s => s);
+                    onUpdate(editingItem.id, { mainText: editFormData.word, related: synList });
+                } else if (editingItem.type === 'antonym') {
+                    onUpdate(editingItem.id, { mainText: editFormData.wordA, related: [editFormData.wordB] });
+                } else if (editingItem.type === 'phrase') {
+                    onUpdate(editingItem.id, { mainText: editFormData.phrase, context: editFormData.context });
+                }
+                setEditingItem(null);
+            };
+
+            // Share to Peers handler
+            const handleShareToPeers = (item) => {
+                setShareConfirm(item);
+            };
+
+            const confirmShare = async () => {
+                if (!shareConfirm || !onShareToPeers || !shareMessage.trim()) return;
+                await onShareToPeers(shareConfirm, shareMessage.trim());
+                setShareConfirm(null);
+                setShareMessage('');
+            };
+
+            const filteredItems = items.filter(i => i.type === activeCategory);
+            const currentCategory = categories.find(c => c.id === activeCategory);
+
+            return (
+                <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 pt-40 pb-12 max-w-6xl mx-auto px-4">
+                    {/* Header with Stats */}
+                    <div className={`${cardBg} rounded-[2.5rem] p-8 shadow-xl`}>
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                            <div>
+                                <h2 className={`text-3xl font-black ${textColor} tracking-tight`}>My Learning</h2>
+                                <p className={`${textSub} mt-1`}>All your vocabulary in one place</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className={`px-4 py-2 rounded-xl ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center gap-2`}>
+                                    <Layers className="w-5 h-5 text-indigo-500" />
+                                    <span className={`font-bold ${theme === 'dark' ? 'text-indigo-300' : 'text-indigo-600'}`}>{items.length} Total</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Category Tabs */}
+                        <div className="flex flex-wrap gap-3 mt-8">
+                            {categories.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setActiveCategory(cat.id)}
+                                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold transition-all duration-300 ${
+                                        activeCategory === cat.id
+                                            ? `bg-gradient-to-r ${cat.color} text-white shadow-lg scale-105`
+                                            : `${theme === 'dark' ? 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50' : 'bg-white/50 text-slate-600 hover:bg-white/80'}`
+                                    }`}
+                                >
+                                    <cat.icon className="w-4 h-4" />
+                                    <span>{cat.label}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                        activeCategory === cat.id
+                                            ? 'bg-white/20'
+                                            : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'
+                                    }`}>{cat.count}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Add New Entry Section - Dropdown Forms */}
+                    <div className={`${cardBg} rounded-[2.5rem] shadow-xl overflow-hidden`}>
+                        {/* Dropdown Toggle Button */}
+                        <button
+                            onClick={() => setShowAddForm(!showAddForm)}
+                            className={`w-full p-6 flex items-center justify-between transition-all duration-300 ${showAddForm ? '' : 'hover:bg-white/5'}`}
+                        >
+                            <h3 className={`text-xl font-bold ${textColor} flex items-center gap-3`}>
+                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${currentCategory.color} flex items-center justify-center shadow-lg`}>
+                                    <Plus className="w-5 h-5 text-white" />
+                                </div>
+                                Add New {currentCategory.label.slice(0, -1)}
+                            </h3>
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${showAddForm ? 'rotate-180' : ''} ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
+                                <ChevronDown className={`w-5 h-5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
+                            </div>
+                        </button>
+
+                        {/* Animated Form Container */}
+                        <div className={`transition-all duration-500 ease-out ${showAddForm ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+                            <div className={`px-8 pb-8 pt-2 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200/50'}`}>
+
+                        {/* Vocabulary Form */}
+                        {activeCategory === 'voca' && (
+                            <form onSubmit={handleVocaSubmit} className="space-y-5">
+                                <div className="grid md:grid-cols-3 gap-5">
+                                    <div className="md:col-span-2 space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Word</label>
+                                        <input name="word" value={vocaForm.word} onChange={e => setVocaForm(p => ({...p, word: e.target.value}))} placeholder="e.g. Serendipity" className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Type</label>
+                                        <select name="pos" value={vocaForm.pos} onChange={e => setVocaForm(p => ({...p, pos: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all appearance-none cursor-pointer ${inputClass}`}>
+                                            <option value="noun">Noun</option>
+                                            <option value="verb">Verb</option>
+                                            <option value="adjective">Adjective</option>
+                                            <option value="adverb">Adverb</option>
+                                            <option value="idiom">Idiom</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-5">
+                                    <div className="space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>IPA (Pronunciation)</label>
+                                        <input name="ipa" value={vocaForm.ipa} onChange={e => setVocaForm(p => ({...p, ipa: e.target.value}))} placeholder="/.../" className={`w-full p-4 rounded-2xl outline-none font-mono text-sm transition-all ${inputClass}`} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Collocations</label>
+                                        <input name="collocations" value={vocaForm.collocations} onChange={e => setVocaForm(p => ({...p, collocations: e.target.value}))} placeholder="strong coffee, heavy rain..." className={`w-full p-4 rounded-2xl outline-none font-medium transition-all ${inputClass}`} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Definition</label>
+                                    <textarea name="definition" value={vocaForm.definition} onChange={e => setVocaForm(p => ({...p, definition: e.target.value}))} rows="2" placeholder="What does it mean?" className={`w-full p-4 rounded-2xl outline-none font-medium resize-none transition-all ${inputClass}`} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Example Sentence</label>
+                                    <textarea name="example" value={vocaForm.example} onChange={e => setVocaForm(p => ({...p, example: e.target.value}))} rows="2" placeholder="Use it in a sentence..." className={`w-full p-4 rounded-2xl outline-none font-medium resize-none transition-all ${inputClass}`} />
+                                </div>
+                                <div className="flex justify-end">
+                                    <button type="submit" className="bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-8 py-4 rounded-2xl font-bold hover:from-indigo-600 hover:to-blue-600 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2">
+                                        <Plus className="w-5 h-5" /> Add Vocabulary
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Synonyms Form */}
+                        {activeCategory === 'synonym' && (
+                            <form onSubmit={handleSynonymSubmit} className="space-y-5">
+                                <div className="grid md:grid-cols-2 gap-5">
+                                    <div className="space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Main Word</label>
+                                        <input value={synonymForm.word} onChange={e => setSynonymForm(p => ({...p, word: e.target.value}))} placeholder="e.g. Happy" className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Synonyms (comma-separated)</label>
+                                        <input value={synonymForm.synonyms} onChange={e => setSynonymForm(p => ({...p, synonyms: e.target.value}))} placeholder="Joyful, Ecstatic, Content..." className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end">
+                                    <button type="submit" className="bg-gradient-to-r from-violet-500 to-purple-500 text-white px-8 py-4 rounded-2xl font-bold hover:from-violet-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2">
+                                        <LinkIcon className="w-5 h-5" /> Connect Synonyms
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Antonyms Form */}
+                        {activeCategory === 'antonym' && (
+                            <form onSubmit={handleAntonymSubmit} className="space-y-5">
+                                <div className="flex flex-col md:flex-row items-center gap-4">
+                                    <div className="flex-1 w-full space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Word</label>
+                                        <input value={antonymForm.wordA} onChange={e => setAntonymForm(p => ({...p, wordA: e.target.value}))} placeholder="e.g. Expand" className={`w-full p-5 rounded-2xl outline-none font-bold text-lg transition-all ${inputClass}`} />
+                                    </div>
+                                    <div className="hidden md:flex shrink-0 justify-center">
+                                        <div className={`font-black text-xl italic w-12 h-12 rounded-full flex items-center justify-center shadow-sm ${theme==='dark'?'bg-slate-700 text-slate-400':'bg-white text-slate-200'}`}>vs</div>
+                                    </div>
+                                    <div className="flex-1 w-full space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Opposite</label>
+                                        <input value={antonymForm.wordB} onChange={e => setAntonymForm(p => ({...p, wordB: e.target.value}))} placeholder="e.g. Contract" className={`w-full p-5 rounded-2xl outline-none font-bold text-lg transition-all ${inputClass}`} />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end">
+                                    <button type="submit" className="bg-gradient-to-r from-rose-500 to-pink-500 text-white px-8 py-4 rounded-2xl font-bold hover:from-rose-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2">
+                                        <ArrowLeftRight className="w-5 h-5" /> Create Antonym Pair
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Phrases Form */}
+                        {activeCategory === 'phrase' && (
+                            <form onSubmit={handlePhraseSubmit} className="space-y-5">
+                                <div className="space-y-2">
+                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>The Phrase</label>
+                                    <input value={phraseForm.phrase} onChange={e => setPhraseForm(p => ({...p, phrase: e.target.value}))} placeholder="e.g. Break a leg" className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Context / When to Use</label>
+                                    <input value={phraseForm.context} onChange={e => setPhraseForm(p => ({...p, context: e.target.value}))} placeholder="e.g. Wishing luck" className={`w-full p-4 rounded-2xl outline-none font-medium transition-all ${inputClass}`} />
+                                </div>
+                                <div className="flex justify-end">
+                                    <button type="submit" className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-8 py-4 rounded-2xl font-bold hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2">
+                                        <MessageCircle className="w-5 h-5" /> Save Phrase
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Items Grid */}
+                    <div className={`${cardBg} rounded-[2.5rem] p-8 shadow-xl`}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                                <currentCategory.icon className="w-5 h-5" />
+                                {currentCategory.label} <span className={`text-sm font-normal ${textSub}`}>({filteredItems.length})</span>
+                            </h3>
+                            {filteredItems.length > 0 && (
+                                <button 
+                                    onClick={() => onDeleteAll(activeCategory)}
+                                    className={`p-2 rounded-xl transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                                    title="Delete all"
+                                >
+                                    <Trash2 className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+
+                        {filteredItems.length === 0 ? (
+                            <div className={`text-center py-16 rounded-3xl border border-dashed ${theme === 'dark' ? 'border-slate-700 text-slate-500' : 'border-slate-200 text-slate-400'}`}>
+                                <currentCategory.icon className={`w-12 h-12 mx-auto mb-4 opacity-30`} />
+                                <p className="font-medium">No {currentCategory.label.toLowerCase()} yet</p>
+                                <p className="text-sm mt-1">Use the form above to add your first entry</p>
+                            </div>
+                        ) : (
+                            <div className={`grid gap-4 ${activeCategory === 'phrase' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                                {filteredItems.map(item => (
+                                    <ItemCard 
+                                        key={item.id} 
+                                        type={item.type}
+                                        title={item.mainText} 
+                                        theme={theme} 
+                                        subtitle={
+                                            item.type === 'voca' ? (
+                                                <span><span className="font-bold text-indigo-500 uppercase text-[10px] tracking-wider mr-2 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.pos}</span>{item.context || "No definition"}</span>
+                                            ) : item.type === 'synonym' ? (
+                                                <span className="text-violet-500">{item.related?.join(', ') || '...'}</span>
+                                            ) : item.type === 'antonym' ? (
+                                                <span className="text-rose-500">↔ {item.related?.[0] || '?'}</span>
+                                            ) : (
+                                                <span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>
+                                            )
+                                        }
+                                        icon={currentCategory.icon}
+                                        onEdit={() => openEditModal(item)}
+                                        onShare={() => handleShareToPeers(item)}
+                                        onDelete={() => onDelete(item.id)}
+                                        interval={item.interval}
+                                        sharedBy={item.sharedBy}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Edit Modal */}
+                    {editingItem && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setEditingItem(null)}>
+                            <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-8 rounded-3xl max-w-2xl w-full shadow-2xl border animate-in zoom-in-95 max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className={`text-2xl font-black ${textColor}`}>Edit {editingItem.type === 'voca' ? 'Vocabulary' : editingItem.type === 'synonym' ? 'Synonym Chain' : editingItem.type === 'antonym' ? 'Antonym Pair' : 'Phrase'}</h3>
+                                    <button onClick={() => setEditingItem(null)} className={`p-2 rounded-xl ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <form onSubmit={handleEditSubmit} className="space-y-5">
+                                    {editingItem.type === 'voca' && (
+                                        <>
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Word</label>
+                                                    <input value={editFormData.word || ''} onChange={e => setEditFormData(p => ({...p, word: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Type</label>
+                                                    <select value={editFormData.pos || 'noun'} onChange={e => setEditFormData(p => ({...p, pos: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all appearance-none cursor-pointer ${inputClass}`}>
+                                                        <option value="noun">Noun</option>
+                                                        <option value="verb">Verb</option>
+                                                        <option value="adjective">Adjective</option>
+                                                        <option value="adverb">Adverb</option>
+                                                        <option value="idiom">Idiom</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>IPA (Pronunciation)</label>
+                                                    <input value={editFormData.ipa || ''} onChange={e => setEditFormData(p => ({...p, ipa: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-mono text-sm transition-all ${inputClass}`} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Collocations</label>
+                                                    <input value={editFormData.collocations || ''} onChange={e => setEditFormData(p => ({...p, collocations: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-medium transition-all ${inputClass}`} />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Definition</label>
+                                                <textarea value={editFormData.definition || ''} onChange={e => setEditFormData(p => ({...p, definition: e.target.value}))} rows="2" className={`w-full p-4 rounded-2xl outline-none font-medium resize-none transition-all ${inputClass}`} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Example Sentence</label>
+                                                <textarea value={editFormData.example || ''} onChange={e => setEditFormData(p => ({...p, example: e.target.value}))} rows="2" className={`w-full p-4 rounded-2xl outline-none font-medium resize-none transition-all ${inputClass}`} />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {editingItem.type === 'synonym' && (
+                                        <>
+                                            <div className="space-y-2">
+                                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Main Word</label>
+                                                <input value={editFormData.word || ''} onChange={e => setEditFormData(p => ({...p, word: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Synonyms (comma-separated)</label>
+                                                <input value={editFormData.synonyms || ''} onChange={e => setEditFormData(p => ({...p, synonyms: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {editingItem.type === 'antonym' && (
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Word</label>
+                                                <input value={editFormData.wordA || ''} onChange={e => setEditFormData(p => ({...p, wordA: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Antonym</label>
+                                                <input value={editFormData.wordB || ''} onChange={e => setEditFormData(p => ({...p, wordB: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {editingItem.type === 'phrase' && (
+                                        <>
+                                            <div className="space-y-2">
+                                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>The Phrase</label>
+                                                <input value={editFormData.phrase || ''} onChange={e => setEditFormData(p => ({...p, phrase: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className={`text-xs uppercase tracking-widest pl-1 ${labelClass}`}>Context</label>
+                                                <input value={editFormData.context || ''} onChange={e => setEditFormData(p => ({...p, context: e.target.value}))} className={`w-full p-4 rounded-2xl outline-none font-bold transition-all ${inputClass}`} />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="flex justify-end gap-3 pt-2">
+                                        <button type="button" onClick={() => setEditingItem(null)} className={`px-6 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Cancel</button>
+                                        <button type="submit" className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center gap-2">
+                                            <Save className="w-4 h-4" /> Save Changes
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Share Confirmation Modal */}
+                    {shareConfirm && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => { setShareConfirm(null); setShareMessage(''); }}>
+                            <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-8 rounded-3xl max-w-lg w-full shadow-2xl border animate-in zoom-in-95`} onClick={e => e.stopPropagation()}>
+                                <div>
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className={`text-2xl font-black ${textColor} flex items-center gap-3`}>
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
+                                                <Share2 className={`w-6 h-6 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+                                            </div>
+                                            Share to Peers
+                                        </h3>
+                                        <button onClick={() => { setShareConfirm(null); setShareMessage(''); }} className={`p-2 rounded-xl ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Item Preview */}
+                                    <div className={`p-4 rounded-2xl mb-5 ${theme === 'dark' ? 'bg-slate-900/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`text-xs uppercase tracking-wider font-bold px-2 py-0.5 rounded ${theme === 'dark' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                {shareConfirm.type === 'voca' ? 'Vocabulary' : shareConfirm.type === 'synonym' ? 'Synonyms' : shareConfirm.type === 'antonym' ? 'Antonyms' : 'Phrase'}
+                                            </span>
+                                        </div>
+                                        <p className={`font-bold text-lg ${textColor}`}>"{shareConfirm.mainText}"</p>
+                                        {shareConfirm.context && <p className={`text-sm mt-1 ${textSub}`}>{shareConfirm.context}</p>}
+                                        {shareConfirm.related && shareConfirm.related.length > 0 && (
+                                            <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-violet-400' : 'text-violet-600'}`}>
+                                                {shareConfirm.type === 'antonym' ? '↔ ' : '→ '}{shareConfirm.related.join(', ')}
+                                            </p>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Custom Message Input */}
+                                    <div className="mb-6">
+                                        <label className={`text-xs uppercase tracking-widest pl-1 mb-2 block ${labelClass}`}>Your Message</label>
+                                        <textarea
+                                            value={shareMessage}
+                                            onChange={(e) => setShareMessage(e.target.value)}
+                                            placeholder="Write something about this word or phrase to share with others..."
+                                            rows="3"
+                                            className={`w-full p-4 rounded-2xl outline-none font-medium resize-none transition-all ${inputClass}`}
+                                            autoFocus
+                                        />
+                                        <p className={`text-xs mt-2 ${textSub}`}>Add context, examples, or tips to help others learn!</p>
+                                    </div>
+                                    
+                                    <div className="flex gap-3 justify-end">
+                                        <button 
+                                            onClick={() => { setShareConfirm(null); setShareMessage(''); }} 
+                                            className={`px-6 py-3 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            onClick={confirmShare}
+                                            disabled={!shareMessage.trim()}
+                                            className={`px-6 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 ${shareMessage.trim() ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/25' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
+                                        >
+                                            <Send className="w-4 h-4" />
+                                            Share to Peers
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- PEERS COMPONENT - SOCIAL LEARNING ---
+        // Guidelines: Every user can create posts. All posts are visible to everyone (no friend restriction).
+        // Users can edit and delete their own posts.
+        const Peers = ({ user, theme }) => {
+            const [posts, setPosts] = useState([]);
+            const [newPost, setNewPost] = useState('');
+            const [postType, setPostType] = useState('general'); // general, vocabulary, phrase, tip
+            const [isPosting, setIsPosting] = useState(false);
+            const [isLoading, setIsLoading] = useState(true);
+            const [selectedPostId, setSelectedPostId] = useState(null);
+            
+            // Edit post state
+            const [editingPost, setEditingPost] = useState(null);
+            const [editContent, setEditContent] = useState('');
+            const [editType, setEditType] = useState('general');
+            const [isUpdating, setIsUpdating] = useState(false);
+            
+            // Delete confirmation state
+            const [deleteConfirm, setDeleteConfirm] = useState(null);
+            
+            // Derive selectedPost from posts array - this keeps it in sync without causing re-renders
+            const selectedPost = useMemo(() => posts.find(p => p.id === selectedPostId), [posts, selectedPostId]);
+
+            const cardBg = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
+            const textColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-gray-400' : 'text-slate-500';
+            const inputClass = theme === 'dark' 
+                ? 'bg-slate-950/50 border border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50' 
+                : 'bg-white border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50';
+
+            const postTypes = [
+                { id: 'general', label: 'General', icon: MessagesSquare, color: 'from-slate-500 to-slate-600' },
+                { id: 'vocabulary', label: 'New Word', icon: Book, color: 'from-indigo-500 to-blue-500' },
+                { id: 'phrase', label: 'Phrase', icon: MessageCircle, color: 'from-amber-500 to-orange-500' },
+                { id: 'tip', label: 'Learning Tip', icon: Sparkles, color: 'from-emerald-500 to-teal-500' },
+            ];
+
+            // Load posts
+            useEffect(() => {
+                const q = query(
+                    collection(db, 'artifacts', appId, 'peerPosts'),
+                    orderBy('createdAt', 'desc'),
+                    limit(50)
+                );
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setPosts(postsData);
+                    setIsLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // Create new post
+            const handleCreatePost = async () => {
+                if (!newPost.trim() || !user) return;
+                setIsPosting(true);
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'peerPosts'), {
+                        content: newPost.trim(),
+                        type: postType,
+                        authorId: user.uid,
+                        authorName: user.displayName || 'Anonymous',
+                        authorPhoto: user.photoURL || null,
+                        createdAt: Date.now(),
+                        likes: [],
+                        likeCount: 0,
+                        commentCount: 0
+                    });
+                    setNewPost('');
+                    setPostType('general');
+                } catch (err) {
+                    console.error('Error creating post:', err);
+                }
+                setIsPosting(false);
+            };
+
+            // Toggle like
+            const handleLike = async (post) => {
+                if (!user) return;
+                const postRef = doc(db, 'artifacts', appId, 'peerPosts', post.id);
+                const likes = post.likes || [];
+                const hasLiked = likes.includes(user.uid);
+                
+                try {
+                    await updateDoc(postRef, {
+                        likes: hasLiked 
+                            ? likes.filter(id => id !== user.uid)
+                            : [...likes, user.uid],
+                        likeCount: hasLiked ? (post.likeCount || 1) - 1 : (post.likeCount || 0) + 1
+                    });
+                } catch (err) {
+                    console.error('Error toggling like:', err);
+                }
+            };
+
+            // Edit post - open edit modal
+            const openEditPost = (post) => {
+                setEditingPost(post);
+                setEditContent(post.content);
+                setEditType(post.type);
+            };
+
+            // Update post
+            const handleUpdatePost = async () => {
+                if (!editContent.trim() || !user || !editingPost) return;
+                if (editingPost.authorId !== user.uid) return; // Only author can edit
+                
+                setIsUpdating(true);
+                try {
+                    const postRef = doc(db, 'artifacts', appId, 'peerPosts', editingPost.id);
+                    await updateDoc(postRef, {
+                        content: editContent.trim(),
+                        type: editType,
+                        editedAt: Date.now()
+                    });
+                    setEditingPost(null);
+                    setEditContent('');
+                } catch (err) {
+                    console.error('Error updating post:', err);
+                }
+                setIsUpdating(false);
+            };
+
+            // Delete post
+            const handleDeletePost = async (postId) => {
+                if (!user) return;
+                const post = posts.find(p => p.id === postId);
+                if (!post || post.authorId !== user.uid) return; // Only author can delete
+                
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'peerPosts', postId));
+                    setDeleteConfirm(null);
+                    setSelectedPostId(null);
+                } catch (err) {
+                    console.error('Error deleting post:', err);
+                }
+            };
+
+            const formatTime = (timestamp) => {
+                if (!timestamp) return '';
+                const diff = Date.now() - timestamp;
+                const mins = Math.floor(diff / 60000);
+                const hours = Math.floor(diff / 3600000);
+                const days = Math.floor(diff / 86400000);
+                
+                if (mins < 1) return 'Just now';
+                if (mins < 60) return `${mins}m ago`;
+                if (hours < 24) return `${hours}h ago`;
+                if (days < 7) return `${days}d ago`;
+                return new Date(timestamp).toLocaleDateString();
+            };
+
+            const getPostTypeInfo = (type) => postTypes.find(t => t.id === type) || postTypes[0];
+
+            // Post Detail Modal - with local state for comments to prevent parent re-renders
+            const PostDetailModal = () => {
+                const [comments, setComments] = useState([]);
+                const [loadingComments, setLoadingComments] = useState(true);
+                const [commentText, setCommentText] = useState('');
+                const [isCommenting, setIsCommenting] = useState(false);
+                
+                // Comment edit/delete state
+                const [editingComment, setEditingComment] = useState(null);
+                const [editCommentText, setEditCommentText] = useState('');
+                const [deleteCommentConfirm, setDeleteCommentConfirm] = useState(null);
+
+                // Track view when modal opens
+                useEffect(() => {
+                    if (!selectedPostId || !user) return;
+                    
+                    // Add view (only once per user per post)
+                    const trackView = async () => {
+                        try {
+                            const postRef = doc(db, 'artifacts', appId, 'peerPosts', selectedPostId);
+                            const currentPost = posts.find(p => p.id === selectedPostId);
+                            const viewers = currentPost?.viewers || [];
+                            
+                            // Only add if user hasn't viewed before
+                            if (!viewers.includes(user.uid)) {
+                                await updateDoc(postRef, {
+                                    viewers: [...viewers, user.uid],
+                                    viewCount: (currentPost?.viewCount || 0) + 1
+                                });
+                            }
+                        } catch (err) {
+                            console.error('Error tracking view:', err);
+                        }
+                    };
+                    trackView();
+                }, [selectedPostId, user?.uid]);
+
+                useEffect(() => {
+                    if (!selectedPostId) return;
+                    setLoadingComments(true);
+                    const q = query(
+                        collection(db, 'artifacts', appId, 'peerPosts', selectedPostId, 'comments'),
+                        orderBy('createdAt', 'asc')
+                    );
+                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                        setComments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                        setLoadingComments(false);
+                    });
+                    return () => unsubscribe();
+                }, [selectedPostId]);
+
+                // Handle adding comment - local to modal
+                const handleAddComment = async () => {
+                    if (!commentText.trim() || !user || !selectedPostId) return;
+                    setIsCommenting(true);
+                    try {
+                        await addDoc(collection(db, 'artifacts', appId, 'peerPosts', selectedPostId, 'comments'), {
+                            content: commentText.trim(),
+                            authorId: user.uid,
+                            authorName: user.displayName || 'Anonymous',
+                            authorPhoto: user.photoURL || null,
+                            createdAt: Date.now()
+                        });
+                        
+                        // Update comment count
+                        const postRef = doc(db, 'artifacts', appId, 'peerPosts', selectedPostId);
+                        const currentPost = posts.find(p => p.id === selectedPostId);
+                        await updateDoc(postRef, {
+                            commentCount: (currentPost?.commentCount || 0) + 1
+                        });
+                        
+                        setCommentText('');
+                    } catch (err) {
+                        console.error('Error adding comment:', err);
+                    }
+                    setIsCommenting(false);
+                };
+
+                // Edit comment
+                const handleEditComment = async () => {
+                    if (!editCommentText.trim() || !editingComment || !selectedPostId) return;
+                    try {
+                        const commentRef = doc(db, 'artifacts', appId, 'peerPosts', selectedPostId, 'comments', editingComment.id);
+                        await updateDoc(commentRef, {
+                            content: editCommentText.trim(),
+                            editedAt: Date.now()
+                        });
+                        setEditingComment(null);
+                        setEditCommentText('');
+                    } catch (err) {
+                        console.error('Error editing comment:', err);
+                    }
+                };
+
+                // Delete comment
+                const handleDeleteComment = async (commentId) => {
+                    if (!selectedPostId) return;
+                    try {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'peerPosts', selectedPostId, 'comments', commentId));
+                        
+                        // Update comment count
+                        const postRef = doc(db, 'artifacts', appId, 'peerPosts', selectedPostId);
+                        const currentPost = posts.find(p => p.id === selectedPostId);
+                        await updateDoc(postRef, {
+                            commentCount: Math.max((currentPost?.commentCount || 1) - 1, 0)
+                        });
+                        
+                        setDeleteCommentConfirm(null);
+                    } catch (err) {
+                        console.error('Error deleting comment:', err);
+                    }
+                };
+
+                if (!selectedPost) return null;
+
+                const typeInfo = getPostTypeInfo(selectedPost.type);
+                const hasLiked = selectedPost.likes?.includes(user?.uid);
+                const isAuthor = selectedPost.authorId === user?.uid;
+
+                return (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setSelectedPostId(null)}>
+                        <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-3xl max-w-2xl w-full shadow-2xl border animate-in zoom-in-95 max-h-[85vh] overflow-hidden flex flex-col`} onClick={e => e.stopPropagation()}>
+                            {/* Header */}
+                            <div className={`p-6 border-b ${theme === 'dark' ? 'border-slate-700' : 'border-slate-100'}`}>
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-center gap-3">
+                                        {selectedPost.authorPhoto ? (
+                                            <img src={selectedPost.authorPhoto} className="w-12 h-12 rounded-full" alt="" />
+                                        ) : (
+                                            <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-lg`}>
+                                                {selectedPost.authorName?.charAt(0) || '?'}
+                                            </div>
+                                        )}
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`font-bold ${textColor}`}>{selectedPost.authorName}</span>
+                                                {selectedPost.editedAt && <span className={`text-xs ${textSub}`}>(edited)</span>}
+                                            </div>
+                                            <div className={`text-sm ${textSub}`}>{formatTime(selectedPost.createdAt)}</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {/* Edit & Delete buttons - only for post author */}
+                                        {isAuthor && (
+                                            <>
+                                                <button 
+                                                    onClick={() => { setSelectedPostId(null); openEditPost(selectedPost); }}
+                                                    className={`p-2 rounded-xl transition-all ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-400 hover:text-indigo-400' : 'hover:bg-slate-100 text-slate-500 hover:text-indigo-600'}`}
+                                                    title="Edit post"
+                                                >
+                                                    <Pencil className="w-5 h-5" />
+                                                </button>
+                                                <button 
+                                                    onClick={() => setDeleteConfirm(selectedPost)}
+                                                    className={`p-2 rounded-xl transition-all ${theme === 'dark' ? 'hover:bg-rose-500/20 text-slate-400 hover:text-rose-400' : 'hover:bg-rose-50 text-slate-500 hover:text-rose-600'}`}
+                                                    title="Delete post"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </>
+                                        )}
+                                        <button onClick={() => setSelectedPostId(null)} className={`p-2 rounded-xl ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-6 flex-1 overflow-y-auto">
+                                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r ${typeInfo.color} text-white text-xs font-bold mb-4`}>
+                                    <typeInfo.icon className="w-3.5 h-3.5" />
+                                    {typeInfo.label}
+                                </div>
+                                
+                                {/* Shared Item Card in Modal */}
+                                {selectedPost.sharedItem && (
+                                    <div className={`p-4 rounded-2xl border mb-4 ${theme === 'dark' ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`text-xs uppercase tracking-wider font-bold px-2 py-0.5 rounded ${
+                                                selectedPost.sharedItem.type === 'voca' ? (theme === 'dark' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600') :
+                                                selectedPost.sharedItem.type === 'synonym' ? (theme === 'dark' ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600') :
+                                                selectedPost.sharedItem.type === 'antonym' ? (theme === 'dark' ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-600') :
+                                                (theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600')
+                                            }`}>
+                                                {selectedPost.sharedItem.type === 'voca' ? 'Vocabulary' : selectedPost.sharedItem.type === 'synonym' ? 'Synonyms' : selectedPost.sharedItem.type === 'antonym' ? 'Antonyms' : 'Phrase'}
+                                            </span>
+                                        </div>
+                                        <p className={`font-bold text-lg ${textColor}`}>"{selectedPost.sharedItem.mainText}"</p>
+                                        {selectedPost.sharedItem.context && <p className={`text-sm mt-1 ${textSub}`}>{selectedPost.sharedItem.context}</p>}
+                                        {selectedPost.sharedItem.related && selectedPost.sharedItem.related.length > 0 && (
+                                            <p className={`text-sm mt-1 font-medium ${selectedPost.sharedItem.type === 'antonym' ? 'text-rose-500' : 'text-violet-500'}`}>
+                                                {selectedPost.sharedItem.type === 'antonym' ? '↔ ' : '→ '}{selectedPost.sharedItem.related.join(', ')}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                <p className={`text-lg leading-relaxed ${textColor}`}>{selectedPost.content}</p>
+
+                                {/* Actions */}
+                                <div className={`flex items-center gap-4 mt-6 pt-4 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-100'}`}>
+                                    <button 
+                                        onClick={() => handleLike(selectedPost)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+                                            hasLiked 
+                                                ? 'bg-rose-500/20 text-rose-500' 
+                                                : theme === 'dark' ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        <Heart className={`w-5 h-5 ${hasLiked ? 'fill-rose-500 animate-like-heart' : ''}`} />
+                                        <span className="font-bold">{selectedPost.likeCount || 0}</span>
+                                    </button>
+                                    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${theme === 'dark' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                                        <MessageSquare className="w-5 h-5" />
+                                        <span className="font-bold">{selectedPost.commentCount || 0}</span>
+                                    </div>
+                                    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${theme === 'dark' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-600'}`} title="Views">
+                                        <Eye className="w-5 h-5" />
+                                        <span className="font-bold">{selectedPost.viewCount || 0}</span>
+                                    </div>
+                                </div>
+
+                                {/* Comments Section */}
+                                <div className="mt-6">
+                                    <h4 className={`font-bold ${textColor} mb-4`}>Comments</h4>
+                                    {loadingComments ? (
+                                        <div className="flex justify-center py-8">
+                                            <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                                        </div>
+                                    ) : comments.length === 0 ? (
+                                        <div className={`text-center py-8 ${textSub}`}>
+                                            <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                            <p>No comments yet. Be the first!</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {comments.map(comment => {
+                                                const isCommentAuthor = comment.authorId === user?.uid;
+                                                
+                                                return (
+                                                    <div key={comment.id} className={`flex gap-3 p-3 rounded-2xl group relative ${theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
+                                                        {comment.authorPhoto ? (
+                                                            <img src={comment.authorPhoto} className="w-8 h-8 rounded-full" alt="" />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-violet-400 flex items-center justify-center text-white text-xs font-bold">
+                                                                {comment.authorName?.charAt(0) || '?'}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`font-bold text-sm ${textColor}`}>{comment.authorName}</span>
+                                                                {comment.editedAt && <span className={`text-[10px] ${textSub}`}>(edited)</span>}
+                                                                <span className={`text-xs ${textSub}`}>{formatTime(comment.createdAt)}</span>
+                                                            </div>
+                                                            
+                                                            {/* Edit mode */}
+                                                            {editingComment?.id === comment.id ? (
+                                                                <div className="mt-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editCommentText}
+                                                                        onChange={e => setEditCommentText(e.target.value)}
+                                                                        className={`w-full px-3 py-2 rounded-lg text-sm outline-none ${inputClass}`}
+                                                                        autoFocus
+                                                                        onKeyPress={e => e.key === 'Enter' && handleEditComment()}
+                                                                    />
+                                                                    <div className="flex gap-2 mt-2">
+                                                                        <button onClick={() => { setEditingComment(null); setEditCommentText(''); }} className={`px-3 py-1 rounded-lg text-xs font-bold ${theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>Cancel</button>
+                                                                        <button onClick={handleEditComment} className="px-3 py-1 rounded-lg text-xs font-bold bg-indigo-500 text-white">Save</button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>{comment.content}</p>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {/* Edit/Delete buttons for comment author */}
+                                                        {isCommentAuthor && !editingComment && (
+                                                            <div className={`absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                                                <button 
+                                                                    onClick={() => { setEditingComment(comment); setEditCommentText(comment.content); }}
+                                                                    className={`p-1.5 rounded-lg transition-all ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}
+                                                                    title="Edit"
+                                                                >
+                                                                    <Pencil className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => setDeleteCommentConfirm(comment)}
+                                                                    className={`p-1.5 rounded-lg transition-all ${theme === 'dark' ? 'hover:bg-rose-500/20 text-slate-400 hover:text-rose-400' : 'hover:bg-rose-50 text-slate-500 hover:text-rose-600'}`}
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Delete Comment Confirmation */}
+                                {deleteCommentConfirm && (
+                                    <div className={`mt-4 p-4 rounded-2xl border ${theme === 'dark' ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'}`}>
+                                        <p className={`text-sm font-medium ${theme === 'dark' ? 'text-rose-300' : 'text-rose-700'} mb-3`}>Delete this comment?</p>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setDeleteCommentConfirm(null)} className={`px-4 py-2 rounded-xl text-sm font-bold ${theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-white text-slate-600'}`}>Cancel</button>
+                                            <button onClick={() => handleDeleteComment(deleteCommentConfirm.id)} className="px-4 py-2 rounded-xl text-sm font-bold bg-rose-500 text-white">Delete</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Comment Input */}
+                            <div className={`p-4 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-100'}`}>
+                                <div className="flex gap-3">
+                                    <input
+                                        type="text"
+                                        value={commentText}
+                                        onChange={e => setCommentText(e.target.value)}
+                                        placeholder="Write a comment..."
+                                        className={`flex-1 px-4 py-3 rounded-xl outline-none ${inputClass}`}
+                                        onKeyPress={e => e.key === 'Enter' && handleAddComment()}
+                                    />
+                                    <button
+                                        onClick={handleAddComment}
+                                        disabled={!commentText.trim() || isCommenting}
+                                        className="px-5 py-3 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white disabled:opacity-50 transition-all hover:from-indigo-600 hover:to-violet-600"
+                                    >
+                                        {isCommenting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 pt-40 pb-12 max-w-3xl mx-auto px-4">
+                    {/* Create Post Section */}
+                    <div className={`${cardBg} rounded-[2.5rem] p-6 shadow-xl`}>
+                        <div className="flex items-start gap-4">
+                            {user?.photoURL ? (
+                                <img src={user.photoURL} className="w-12 h-12 rounded-full" alt="" />
+                            ) : (
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-lg">
+                                    {user?.displayName?.charAt(0) || '?'}
+                                </div>
+                            )}
+                            <div className="flex-1">
+                                <textarea
+                                    value={newPost}
+                                    onChange={e => setNewPost(e.target.value)}
+                                    placeholder="Share what you've learned today..."
+                                    rows="3"
+                                    className={`w-full px-4 py-3 rounded-2xl outline-none resize-none ${inputClass}`}
+                                />
+                                
+                                <div className="flex items-center justify-between mt-4">
+                                    <div className="flex gap-2 overflow-x-auto pb-1">
+                                        {postTypes.map(type => (
+                                            <button
+                                                key={type.id}
+                                                onClick={() => setPostType(type.id)}
+                                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                                                    postType === type.id
+                                                        ? `bg-gradient-to-r ${type.color} text-white shadow-md`
+                                                        : theme === 'dark' ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                }`}
+                                            >
+                                                <type.icon className="w-3.5 h-3.5" />
+                                                {type.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={handleCreatePost}
+                                        disabled={!newPost.trim() || isPosting}
+                                        className="px-6 py-2.5 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white disabled:opacity-50 transition-all hover:from-indigo-600 hover:to-violet-600 active:scale-95 flex items-center gap-2"
+                                    >
+                                        {isPosting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                        Post
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Posts Feed */}
+                    {isLoading ? (
+                        <div className="flex justify-center py-16">
+                            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                        </div>
+                    ) : posts.length === 0 ? (
+                        <div className={`${cardBg} rounded-[2.5rem] p-12 text-center shadow-xl`}>
+                            <Users className={`w-16 h-16 mx-auto mb-4 ${textSub} opacity-30`} />
+                            <h3 className={`text-xl font-bold ${textColor} mb-2`}>No posts yet</h3>
+                            <p className={textSub}>Be the first to share what you've learned!</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {posts.map((post, index) => {
+                                const typeInfo = getPostTypeInfo(post.type);
+                                const hasLiked = post.likes?.includes(user?.uid);
+                                const isPostAuthor = post.authorId === user?.uid;
+                                
+                                return (
+                                    <div 
+                                        key={post.id} 
+                                        className={`${cardBg} rounded-[2rem] p-6 shadow-lg hover:shadow-xl transition-all duration-300 animate-post-in cursor-pointer group relative`}
+                                        style={{ animationDelay: `${index * 50}ms` }}
+                                        onClick={() => setSelectedPostId(post.id)}
+                                    >
+                                        {/* Edit/Delete buttons for author - shown on hover */}
+                                        {isPostAuthor && (
+                                            <div className={`absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); openEditPost(post); }}
+                                                    className={`p-2 rounded-lg transition-all ${theme === 'dark' ? 'bg-slate-700/80 hover:bg-slate-600 text-slate-300' : 'bg-white/80 hover:bg-slate-100 text-slate-600'} shadow-sm`}
+                                                    title="Edit"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setDeleteConfirm(post); }}
+                                                    className={`p-2 rounded-lg transition-all ${theme === 'dark' ? 'bg-slate-700/80 hover:bg-rose-500/30 text-slate-300 hover:text-rose-400' : 'bg-white/80 hover:bg-rose-50 text-slate-600 hover:text-rose-600'} shadow-sm`}
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="flex items-start gap-4">
+                                            {post.authorPhoto ? (
+                                                <img src={post.authorPhoto} className="w-11 h-11 rounded-full ring-2 ring-indigo-500/20" alt="" />
+                                            ) : (
+                                                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold">
+                                                    {post.authorName?.charAt(0) || '?'}
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`font-bold ${textColor}`}>{post.authorName}</span>
+                                                    {post.editedAt && <span className={`text-xs ${textSub}`}>(edited)</span>}
+                                                    <span className={`text-xs ${textSub}`}>•</span>
+                                                    <span className={`text-xs ${textSub}`}>{formatTime(post.createdAt)}</span>
+                                                </div>
+                                                
+                                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r ${typeInfo.color} text-white text-[10px] font-bold mt-1`}>
+                                                    <typeInfo.icon className="w-3 h-3" />
+                                                    {typeInfo.label}
+                                                </div>
+                                                
+                                                {/* Shared Item Card */}
+                                                {post.sharedItem && (
+                                                    <div className={`mt-3 p-3 rounded-xl border ${theme === 'dark' ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className={`text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
+                                                                post.sharedItem.type === 'voca' ? (theme === 'dark' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600') :
+                                                                post.sharedItem.type === 'synonym' ? (theme === 'dark' ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600') :
+                                                                post.sharedItem.type === 'antonym' ? (theme === 'dark' ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-600') :
+                                                                (theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600')
+                                                            }`}>
+                                                                {post.sharedItem.type === 'voca' ? 'Word' : post.sharedItem.type === 'synonym' ? 'Synonyms' : post.sharedItem.type === 'antonym' ? 'Antonyms' : 'Phrase'}
+                                                            </span>
+                                                        </div>
+                                                        <p className={`font-bold ${textColor}`}>"{post.sharedItem.mainText}"</p>
+                                                        {post.sharedItem.context && <p className={`text-sm mt-1 ${textSub}`}>{post.sharedItem.context}</p>}
+                                                        {post.sharedItem.related && post.sharedItem.related.length > 0 && (
+                                                            <p className={`text-sm mt-1 ${post.sharedItem.type === 'antonym' ? 'text-rose-500' : 'text-violet-500'}`}>
+                                                                {post.sharedItem.type === 'antonym' ? '↔ ' : '→ '}{post.sharedItem.related.join(', ')}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                
+                                                <p className={`mt-3 ${textColor} leading-relaxed line-clamp-4`}>{post.content}</p>
+                                                
+                                                <div className={`flex items-center gap-4 mt-4 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleLike(post); }}
+                                                        className={`flex items-center gap-1.5 text-sm font-medium transition-all ${
+                                                            hasLiked ? 'text-rose-500' : textSub + ' hover:text-rose-500'
+                                                        }`}
+                                                    >
+                                                        <Heart className={`w-4 h-4 ${hasLiked ? 'fill-rose-500 animate-like-heart' : ''}`} />
+                                                        {post.likeCount || 0}
+                                                    </button>
+                                                    <button className={`flex items-center gap-1.5 text-sm font-medium ${textSub} hover:text-indigo-500 transition-all`}>
+                                                        <MessageSquare className="w-4 h-4" />
+                                                        {post.commentCount || 0}
+                                                    </button>
+                                                    <span className={`flex items-center gap-1.5 text-sm font-medium ${textSub}`} title="Views">
+                                                        <Eye className="w-4 h-4" />
+                                                        {post.viewCount || 0}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Post Detail Modal */}
+                    <PostDetailModal />
+
+                    {/* Edit Post Modal */}
+                    {editingPost && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setEditingPost(null)}>
+                            <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-3xl max-w-xl w-full shadow-2xl border animate-in zoom-in-95 p-6`} onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                                        <Pencil className="w-5 h-5 text-indigo-500" />
+                                        Edit Post
+                                    </h3>
+                                    <button onClick={() => setEditingPost(null)} className={`p-2 rounded-xl ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                
+                                <textarea
+                                    value={editContent}
+                                    onChange={e => setEditContent(e.target.value)}
+                                    placeholder="What's on your mind?"
+                                    rows="4"
+                                    className={`w-full px-4 py-3 rounded-2xl outline-none resize-none ${inputClass}`}
+                                />
+                                
+                                {/* Shared item preview (read-only) */}
+                                {editingPost.sharedItem && (
+                                    <div className={`mt-4 p-3 rounded-xl border ${theme === 'dark' ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                        <div className={`text-xs ${textSub} mb-1`}>Shared item (cannot be changed)</div>
+                                        <p className={`font-bold ${textColor}`}>"{editingPost.sharedItem.mainText}"</p>
+                                    </div>
+                                )}
+                                
+                                <div className="flex items-center justify-between mt-4">
+                                    <div className="flex gap-2 overflow-x-auto pb-1">
+                                        {postTypes.map(type => (
+                                            <button
+                                                key={type.id}
+                                                onClick={() => setEditType(type.id)}
+                                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                                                    editType === type.id
+                                                        ? `bg-gradient-to-r ${type.color} text-white shadow-md`
+                                                        : theme === 'dark' ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                }`}
+                                            >
+                                                <type.icon className="w-3.5 h-3.5" />
+                                                {type.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                <div className="flex gap-3 mt-6">
+                                    <button
+                                        onClick={() => setEditingPost(null)}
+                                        className={`flex-1 px-6 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleUpdatePost}
+                                        disabled={!editContent.trim() || isUpdating}
+                                        className="flex-1 px-6 py-3 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white disabled:opacity-50 transition-all hover:from-indigo-600 hover:to-violet-600 flex items-center justify-center gap-2"
+                                    >
+                                        {isUpdating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Delete Confirmation Modal */}
+                    {deleteConfirm && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
+                            <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-3xl max-w-md w-full shadow-2xl border animate-in zoom-in-95 p-8`} onClick={e => e.stopPropagation()}>
+                                <div className="text-center">
+                                    <div className={`w-16 h-16 mx-auto mb-5 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-rose-500/20' : 'bg-rose-100'}`}>
+                                        <Trash2 className={`w-8 h-8 ${theme === 'dark' ? 'text-rose-400' : 'text-rose-500'}`} />
+                                    </div>
+                                    <h3 className={`text-2xl font-black mb-3 ${textColor}`}>Delete Post?</h3>
+                                    <p className={`mb-6 ${textSub}`}>This action cannot be undone. Your post and all its comments will be permanently removed.</p>
+                                    <div className="flex gap-3 justify-center">
+                                        <button 
+                                            onClick={() => setDeleteConfirm(null)} 
+                                            className={`px-6 py-3 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDeletePost(deleteConfirm.id)} 
+                                            className="px-6 py-3 rounded-2xl font-bold bg-gradient-to-r from-rose-500 to-red-500 text-white hover:from-rose-600 hover:to-red-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-rose-500/25 flex items-center gap-2"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -3685,7 +4988,7 @@ Respond with ONLY the JSON object, nothing else.`
             return (
                 <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
                     <div 
-                        className={`${panelBg} backdrop-blur-xl w-full max-w-lg rounded-3xl shadow-2xl border ${borderColor} overflow-hidden animate-in zoom-in-95`}
+                        className={`${panelBg} backdrop-blur-xl w-full max-w-lg rounded-3xl shadow-2xl border ${borderColor} overflow-hidden animate-messenger-open`}
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -3965,7 +5268,7 @@ Respond with ONLY the JSON object, nothing else.`
             return (
                 <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
                     <div 
-                        className={`${panelBg} backdrop-blur-xl w-full max-w-lg rounded-3xl shadow-2xl border ${borderColor} overflow-hidden animate-in zoom-in-95`}
+                        className={`${panelBg} backdrop-blur-xl w-full max-w-lg rounded-3xl shadow-2xl border ${borderColor} overflow-hidden animate-messenger-open`}
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -4352,6 +5655,38 @@ Respond with ONLY the JSON object, nothing else.`
                 setIsAdding(false);
             };
 
+            // Share item to Peers feed
+            const handleShareToPeers = async (item, customMessage) => {
+                if (!user || !customMessage) return;
+                try {
+                    const postType = item.type === 'phrase' ? 'phrase' : 'vocabulary';
+
+                    await addDoc(collection(db, 'artifacts', appId, 'peerPosts'), {
+                        content: customMessage,
+                        type: postType,
+                        authorId: user.uid,
+                        authorName: user.displayName || 'Anonymous',
+                        authorPhoto: user.photoURL || null,
+                        createdAt: Date.now(),
+                        likes: [],
+                        likeCount: 0,
+                        commentCount: 0,
+                        sharedItem: {
+                            type: item.type,
+                            mainText: item.mainText,
+                            context: item.context || null,
+                            related: item.related || null,
+                            pos: item.pos || null
+                        }
+                    });
+                    
+                    showToast('Shared to Peers!', 'success');
+                } catch (err) {
+                    console.error('Error sharing to peers:', err);
+                    showToast('Failed to share', 'error');
+                }
+            };
+
             const dueItems = items.filter(i => i.nextReview < Date.now());
 
             const startDueReview = (category = 'all') => {
@@ -4392,10 +5727,8 @@ Respond with ONLY the JSON object, nothing else.`
                     <main>
                         {activeTab === 'landing' && ( <LandingPage setActiveTab={setActiveTab} theme={theme} /> )}
                         {activeTab === 'dashboard' && ( <Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} /> )}
-                        {activeTab === 'voca' && ( <VocaManager items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} /> )}
-                        {activeTab === 'synonyms' && ( <SynonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} /> )}
-                        {activeTab === 'antonyms' && ( <AntonymManager items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} /> )}
-                        {activeTab === 'phrases' && ( <PhraseManager items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} /> )}
+                        {activeTab === 'mylearning' && ( <MyLearning items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} user={user} onShareToPeers={handleShareToPeers} /> )}
+                        {activeTab === 'peers' && ( <Peers user={user} theme={theme} /> )}
                     </main>
                     {reviewQueue && ( <ReviewSession dueItems={reviewQueue} mode={reviewMode} onClose={() => setReviewQueue(null)} onComplete={handleUpdateSRS} theme={theme} /> )}
                     
