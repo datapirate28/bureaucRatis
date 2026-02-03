@@ -182,7 +182,7 @@
             LogOut, ShieldCheck, LogIn, ChevronDown, Play, ArrowLeft, Trophy, 
             Book, Mic, Volume2, Wand2, Star, ChevronRight, Activity, Grid, List,
             Moon, Sun, Upload, Pencil, Send, Users, MessageSquare, Circle, Heart, UserPlus, UserMinus, UserCheck,
-            CheckCheck, Image as ImageIcon, MessagesSquare
+            CheckCheck, Image as ImageIcon, MessagesSquare, Share2, Inbox, Gift, Package, FileText, ExternalLink
         } from 'lucide-react';
         
         // Import Firebase
@@ -283,7 +283,7 @@
 
         // --- COMPONENTS ---
 
-        const ItemCard = ({ title, subtitle, icon: Icon, colorClass, onDelete, onSpeak, onEdit, interval, type, theme }) => {
+        const ItemCard = ({ title, subtitle, icon: Icon, colorClass, onDelete, onSpeak, onEdit, interval, type, theme, sharedBy }) => {
             const gradients = {
                 voca: "from-indigo-500 to-blue-500",
                 synonym: "from-violet-500 to-purple-500",
@@ -304,12 +304,31 @@
 
             return (
                 <div className={`${cardClass} p-4 rounded-3xl border flex items-center gap-5 transition-all duration-300 group`}>
-                    <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-md shrink-0`}>
+                    <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-md shrink-0 relative`}>
                         <Icon className="w-8 h-8" />
+                        {sharedBy && (
+                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-800 flex items-center justify-center" title={`Shared by ${sharedBy.displayName}`}>
+                                <Share2 className="w-3 h-3 text-white" />
+                            </div>
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <h4 className={`text-xl font-bold ${textMain} truncate`}>{title}</h4>
                         <p className={`${textSub} text-sm font-medium mt-1 truncate`}>{subtitle}</p>
+                        {sharedBy && (
+                            <div className="flex items-center gap-1.5 mt-2">
+                                {sharedBy.photoURL ? (
+                                    <img src={sharedBy.photoURL} className="w-4 h-4 rounded-full" alt="" />
+                                ) : (
+                                    <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                        <User className="w-2.5 h-2.5 text-emerald-500" />
+                                    </div>
+                                )}
+                                <span className="text-xs font-medium text-emerald-500">
+                                    Shared by {sharedBy.displayName}
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <div className="flex flex-col gap-2">
                         {onSpeak && (
@@ -417,7 +436,7 @@
             </div>
         );
 
-        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages }) => {
+        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages, setIsShareModalOpen, setIsSharingInboxOpen, shareRequestCount }) => {
             const navItems = [
                 { id: 'dashboard', label: 'Dashboard', icon: Grid },
                 { id: 'voca', label: 'Vocab', icon: Book }, // Changed from "Voca" to "Vocab"
@@ -426,6 +445,51 @@
                 { id: 'phrases', label: 'Phrases', icon: MessageCircle },
             ];
             const level = Math.floor((items?.length || 0) / 5) + 1;
+            
+            // State for mobile tap-to-expand icons
+            const [iconsExpanded, setIconsExpanded] = React.useState(false);
+            const iconsContainerRef = React.useRef(null);
+            
+            // Handle click outside to collapse icons on mobile
+            React.useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (iconsContainerRef.current && !iconsContainerRef.current.contains(event.target)) {
+                        setIconsExpanded(false);
+                    }
+                };
+                if (iconsExpanded) {
+                    document.addEventListener('mousedown', handleClickOutside);
+                    document.addEventListener('touchstart', handleClickOutside);
+                }
+                return () => {
+                    document.removeEventListener('mousedown', handleClickOutside);
+                    document.removeEventListener('touchstart', handleClickOutside);
+                };
+            }, [iconsExpanded]);
+            
+            // Handle messenger button click - expand first on mobile, then open
+            const handleMessengerClick = () => {
+                // Check if it's a touch device (mobile)
+                const isTouchDevice = window.matchMedia('(hover: none)').matches;
+                if (isTouchDevice && !iconsExpanded) {
+                    setIconsExpanded(true);
+                } else {
+                    setIsMessengerOpen(true);
+                    setIconsExpanded(false);
+                }
+            };
+            
+            // Handle share button click
+            const handleShareClick = () => {
+                setIsShareModalOpen(true);
+                setIconsExpanded(false);
+            };
+            
+            // Handle inbox button click
+            const handleInboxClick = () => {
+                setIsSharingInboxOpen(true);
+                setIconsExpanded(false);
+            };
 
             const navClass = theme === 'dark' ? 'nav-glass-dark' : 'nav-glass-light';
             // Dark Mode: White text for base. Light Mode: Slate 600.
@@ -493,49 +557,96 @@
                             </div>
                         </div>
                     </div>
-                    {/* Floating Icons Beneath Nav - Aligned with Logo and User */}
+                    {/* Floating Icons - Left side horizontal, Right side theme toggle */}
                     <div className="fixed top-24 left-0 right-0 z-40 px-4 md:px-8">
-                        <div className="max-w-6xl mx-auto flex justify-between items-center px-6">
-                            {/* Messenger Button - Beneath Logo */}
-                            <div className="animate-slide-up delay-300">
-                                <button 
-                                    onClick={() => setIsMessengerOpen(true)}
-                                    className={`relative p-2.5 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 group ${
-                                        theme === 'dark' 
-                                            ? 'bg-gradient-to-br from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500' 
-                                            : 'bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400'
-                                    }`}
-                                    title="Open Messages"
-                                >
-                                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="transition-transform group-hover:scale-110">
-                                        {/* Modern chat bubble */}
-                                        <path d="M12 3C7.03 3 3 6.58 3 11C3 13.39 4.32 15.5 6.4 16.83L5 21L9.73 18.76C10.47 18.91 11.23 19 12 19C16.97 19 21 15.42 21 11C21 6.58 16.97 3 12 3Z" fill="white" fillOpacity="0.95"/>
-                                        {/* Typing dots */}
-                                        <circle cx="8" cy="11" r="1.5" fill="#6366f1"/>
-                                        <circle cx="12" cy="11" r="1.5" fill="#8b5cf6"/>
-                                        <circle cx="16" cy="11" r="1.5" fill="#a855f7"/>
-                                    </svg>
-                                    {/* Notification Badge */}
-                                    {totalUnreadMessages > 0 && (
-                                        <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md border-2 border-white animate-pulse">
-                                            {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
-                                        </span>
-                                    )}
-                                </button>
+                        <div className="max-w-6xl mx-auto flex justify-between items-start px-2 sm:px-6">
+                            {/* Left Side - Messenger with expandable icons (horizontal) */}
+                            <div ref={iconsContainerRef} className="flex flex-row items-center gap-2 group/icons">
+                                {/* Messenger Button - Always visible */}
+                                <div className="animate-slide-up delay-300">
+                                    <button 
+                                        onClick={handleMessengerClick}
+                                        className={`relative p-2 sm:p-2.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
+                                            theme === 'dark' 
+                                                ? 'bg-gradient-to-br from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500' 
+                                                : 'bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400'
+                                        }`}
+                                        title={iconsExpanded ? "Open Messages" : "Tap to expand options"}
+                                    >
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="sm:w-[26px] sm:h-[26px] transition-transform hover:scale-110">
+                                            {/* Modern chat bubble */}
+                                            <path d="M12 3C7.03 3 3 6.58 3 11C3 13.39 4.32 15.5 6.4 16.83L5 21L9.73 18.76C10.47 18.91 11.23 19 12 19C16.97 19 21 15.42 21 11C21 6.58 16.97 3 12 3Z" fill="white" fillOpacity="0.95"/>
+                                            {/* Typing dots */}
+                                            <circle cx="8" cy="11" r="1.5" fill="#6366f1"/>
+                                            <circle cx="12" cy="11" r="1.5" fill="#8b5cf6"/>
+                                            <circle cx="16" cy="11" r="1.5" fill="#a855f7"/>
+                                        </svg>
+                                        {/* Notification Badge */}
+                                        {totalUnreadMessages > 0 && (
+                                            <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 min-w-[18px] h-[18px] sm:min-w-[20px] sm:h-[20px] px-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center shadow-md border-2 border-white animate-pulse">
+                                                {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Share Button - Hidden by default, shows on hover (desktop) or tap (mobile) */}
+                                <div className={`transition-all duration-300 ease-out delay-75 ${
+                                    iconsExpanded 
+                                        ? 'opacity-100 translate-x-0 scale-100' 
+                                        : 'opacity-0 -translate-x-2 scale-90 pointer-events-none sm:pointer-events-auto sm:group-hover/icons:opacity-100 sm:group-hover/icons:translate-x-0 sm:group-hover/icons:scale-100'
+                                }`}>
+                                    <button 
+                                        onClick={handleShareClick}
+                                        className={`relative p-2 sm:p-2.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
+                                            theme === 'dark' 
+                                                ? 'bg-gradient-to-br from-emerald-600/90 to-teal-600/90 hover:from-emerald-500 hover:to-teal-500 border border-white/10' 
+                                                : 'bg-gradient-to-br from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400'
+                                        }`}
+                                        title="Share Vocabulary"
+                                    >
+                                        <Share2 className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
+                                    </button>
+                                </div>
+
+                                {/* Sharing Inbox Button - Hidden by default, shows on hover (desktop) or tap (mobile) */}
+                                <div className={`transition-all duration-300 ease-out delay-150 ${
+                                    iconsExpanded 
+                                        ? 'opacity-100 translate-x-0 scale-100' 
+                                        : 'opacity-0 -translate-x-2 scale-90 pointer-events-none sm:pointer-events-auto sm:group-hover/icons:opacity-100 sm:group-hover/icons:translate-x-0 sm:group-hover/icons:scale-100'
+                                }`}>
+                                    <button 
+                                        onClick={handleInboxClick}
+                                        className={`relative p-2 sm:p-2.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
+                                            theme === 'dark' 
+                                                ? 'bg-gradient-to-br from-amber-600/90 to-orange-600/90 hover:from-amber-500 hover:to-orange-500 border border-white/10' 
+                                                : 'bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400'
+                                        }`}
+                                        title="Sharing Inbox"
+                                    >
+                                        <Inbox className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
+                                        {/* Notification Badge - Always visible when there are requests */}
+                                        {shareRequestCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 min-w-[18px] h-[18px] sm:min-w-[20px] sm:h-[20px] px-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center shadow-md border-2 border-white animate-pulse">
+                                                {shareRequestCount > 99 ? '99+' : shareRequestCount}
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
 
-                            {/* Theme Toggle - Beneath User Icon */}
+                            {/* Right Side - Theme Toggle */}
                             <div className="animate-slide-up delay-500">
                                 <button 
                                     onClick={toggleTheme} 
-                                    className={`p-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
+                                    className={`p-2 sm:p-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 ${
                                         theme === 'dark' 
                                             ? 'bg-gradient-to-br from-slate-700/90 to-slate-800/90 text-indigo-300 hover:from-slate-600 hover:to-slate-700 border border-white/10' 
                                             : 'bg-gradient-to-br from-indigo-100/95 to-purple-100/95 text-indigo-600 hover:from-indigo-50 hover:to-purple-50'
                                     }`}
                                     title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
                                 >
-                                    {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                                    {theme === 'dark' ? <Sun className="w-[18px] h-[18px] sm:w-5 sm:h-5" /> : <Moon className="w-[18px] h-[18px] sm:w-5 sm:h-5" />}
                                 </button>
                             </div>
                         </div>
@@ -1087,7 +1198,7 @@ Respond with ONLY the JSON object, nothing else.`
                         </div>
                     }>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {vocaItems.map(item => (<ItemCard key={item.id} type="voca" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-indigo-500 uppercase text-[10px] tracking-wider mr-2 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.pos}</span>{item.context || "No definition"}</span>} icon={Book} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} interval={item.interval} />))}
+                            {vocaItems.map(item => (<ItemCard key={item.id} type="voca" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-indigo-500 uppercase text-[10px] tracking-wider mr-2 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.pos}</span>{item.context || "No definition"}</span>} icon={Book} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} interval={item.interval} sharedBy={item.sharedBy} />))}
                         </div>
                     </ManagerContainer>
                     
@@ -1235,6 +1346,20 @@ Respond with ONLY the JSON object, nothing else.`
                         <div className="shrink-0 flex flex-col items-center pt-4"><div className={`w-8 h-8 rounded-full border flex items-center justify-center shadow-inner ${theme==='dark'?'bg-slate-800 border-slate-600 text-indigo-400':'bg-indigo-50 border-indigo-100 text-indigo-600'}`}><LinkIcon className="w-3.5 h-3.5" /></div></div>
                         <div className="flex-1 text-center min-w-0"><div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Synonyms</div><div className={`text-xl font-black truncate ${theme==='dark'?'text-slate-300':'text-slate-800'}`}>{item.related?.[0] || '...'}{item.related?.length > 1 && <span className="text-indigo-500 text-xs ml-1 align-top">+{item.related.length - 1}</span>}</div></div>
                     </div>
+                    {item.sharedBy && (
+                        <div className="flex items-center justify-center gap-1.5 mt-2">
+                            {item.sharedBy.photoURL ? (
+                                <img src={item.sharedBy.photoURL} className="w-4 h-4 rounded-full" alt="" />
+                            ) : (
+                                <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <User className="w-2.5 h-2.5 text-emerald-500" />
+                                </div>
+                            )}
+                            <span className="text-xs font-medium text-emerald-500">
+                                Shared by {item.sharedBy.displayName}
+                            </span>
+                        </div>
+                    )}
                     <div className={`flex justify-end gap-2 mt-2 pt-2 border-t ${theme==='dark'?'border-slate-800':'border-slate-50'}`}>
                         <button onClick={() => openEditModal(item)} className="text-slate-400 hover:text-indigo-500 transition-colors p-1.5"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => onDelete(item.id)} className="text-slate-400 hover:text-indigo-500 transition-colors p-1.5"><Trash2 className="w-4 h-4" /></button>
@@ -1396,6 +1521,20 @@ Respond with ONLY the JSON object, nothing else.`
                         <div className="shrink-0 flex flex-col items-center"><div className={`w-10 h-10 rounded-full border flex items-center justify-center text-xs font-black shadow-inner ${theme==='dark'?'bg-slate-800 border-slate-600 text-rose-400':'bg-rose-50 border-rose-100 text-rose-600'}`}>VS</div></div>
                         <div className="flex-1 text-center min-w-0"><div className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">Negative</div><h4 className={`text-xl font-black truncate ${theme==='dark'?'text-white':'text-slate-800'}`}>{item.related?.[0] || '?'}</h4></div>
                     </div>
+                    {item.sharedBy && (
+                        <div className="flex items-center justify-center gap-1.5 mt-3">
+                            {item.sharedBy.photoURL ? (
+                                <img src={item.sharedBy.photoURL} className="w-4 h-4 rounded-full" alt="" />
+                            ) : (
+                                <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <User className="w-2.5 h-2.5 text-emerald-500" />
+                                </div>
+                            )}
+                            <span className="text-xs font-medium text-emerald-500">
+                                Shared by {item.sharedBy.displayName}
+                            </span>
+                        </div>
+                    )}
                     <div className={`flex justify-end gap-2 items-end mt-6 pt-4 border-t ${theme==='dark'?'border-slate-800':'border-slate-50'}`}>
                         <button onClick={() => openEditModal(item)} className="text-slate-400 hover:text-rose-500 transition-colors p-1"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => onDelete(item.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
@@ -1611,7 +1750,7 @@ Respond with ONLY the JSON object, nothing else.`
                             )}
                         </div>
                     }>
-                        <div className="grid grid-cols-1 gap-5">{phraseItems.map(item => (<ItemCard key={item.id} type="phrase" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>} icon={MessageCircle} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} interval={item.interval} />))}</div>
+                        <div className="grid grid-cols-1 gap-5">{phraseItems.map(item => (<ItemCard key={item.id} type="phrase" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>} icon={MessageCircle} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} interval={item.interval} sharedBy={item.sharedBy} />))}</div>
                     </ManagerContainer>
                 </div>
             );
@@ -3440,6 +3579,566 @@ Respond with ONLY the JSON object, nothing else.`
             );
         };
 
+        // --- SHARING SYSTEM COMPONENTS ---
+        
+        // Share Vocabulary Modal - Select users and content to share
+        const ShareVocabularyModal = ({ isOpen, onClose, user, items, friends, theme }) => {
+            const [selectedFriend, setSelectedFriend] = useState(null);
+            const [selectedType, setSelectedType] = useState('all'); // 'all', 'voca', 'synonym', 'antonym', 'phrase'
+            const [selectedItems, setSelectedItems] = useState([]);
+            const [isSending, setIsSending] = useState(false);
+            const [step, setStep] = useState(1); // 1: select friend, 2: select content
+            const [message, setMessage] = useState('');
+
+            if (!isOpen) return null;
+
+            const panelBg = theme === 'dark' ? 'bg-[#0f172a]/95' : 'bg-white/95';
+            const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+            const textMain = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-slate-400' : 'text-slate-500';
+            const inputBg = theme === 'dark' ? 'bg-slate-800/50 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800';
+            const hoverBg = theme === 'dark' ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50';
+
+            const filteredItems = selectedType === 'all' 
+                ? items 
+                : items.filter(i => i.type === selectedType);
+
+            const toggleItemSelection = (itemId) => {
+                setSelectedItems(prev => 
+                    prev.includes(itemId) 
+                        ? prev.filter(id => id !== itemId)
+                        : [...prev, itemId]
+                );
+            };
+
+            const selectAllItems = () => {
+                if (selectedItems.length === filteredItems.length) {
+                    setSelectedItems([]);
+                } else {
+                    setSelectedItems(filteredItems.map(i => i.id));
+                }
+            };
+
+            const sendShareRequest = async () => {
+                if (!selectedFriend || selectedItems.length === 0 || !user) return;
+                setIsSending(true);
+
+                try {
+                    const itemsToShare = items.filter(i => selectedItems.includes(i.id));
+                    
+                    // Create a share request in the recipient's inbox
+                    await addDoc(collection(db, 'artifacts', appId, 'chatUsers', selectedFriend.id, 'shareRequests'), {
+                        senderId: user.uid,
+                        senderName: user.displayName || 'Anonymous',
+                        senderPhoto: user.photoURL || '',
+                        senderEmail: user.email || '',
+                        items: itemsToShare.map(item => ({
+                            ...item,
+                            originalId: item.id,
+                            sharedBy: {
+                                uid: user.uid,
+                                displayName: user.displayName || 'Anonymous',
+                                photoURL: user.photoURL || '',
+                                email: user.email || ''
+                            },
+                            sharedAt: Date.now()
+                        })),
+                        message: message.trim(),
+                        timestamp: Date.now(),
+                        status: 'pending'
+                    });
+
+                    // Reset and close
+                    setSelectedFriend(null);
+                    setSelectedItems([]);
+                    setMessage('');
+                    setStep(1);
+                    onClose();
+                } catch (err) {
+                    console.error('Error sending share request:', err);
+                }
+                setIsSending(false);
+            };
+
+            const getTypeIcon = (type) => {
+                switch(type) {
+                    case 'voca': return <Book className="w-4 h-4" />;
+                    case 'synonym': return <LinkIcon className="w-4 h-4" />;
+                    case 'antonym': return <ArrowLeftRight className="w-4 h-4" />;
+                    case 'phrase': return <MessageCircle className="w-4 h-4" />;
+                    default: return <FileText className="w-4 h-4" />;
+                }
+            };
+
+            const getTypeColor = (type) => {
+                switch(type) {
+                    case 'voca': return 'text-indigo-500 bg-indigo-500/10';
+                    case 'synonym': return 'text-violet-500 bg-violet-500/10';
+                    case 'antonym': return 'text-rose-500 bg-rose-500/10';
+                    case 'phrase': return 'text-amber-500 bg-amber-500/10';
+                    default: return 'text-slate-500 bg-slate-500/10';
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+                    <div 
+                        className={`${panelBg} backdrop-blur-xl w-full max-w-lg rounded-3xl shadow-2xl border ${borderColor} overflow-hidden animate-in zoom-in-95`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className={`p-5 border-b ${borderColor} flex items-center justify-between`}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center">
+                                    <Share2 className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className={`font-bold text-lg ${textMain}`}>Share Vocabulary</h3>
+                                    <p className={`text-xs ${textSub}`}>Step {step} of 2</p>
+                                </div>
+                            </div>
+                            <button onClick={onClose} className={`p-2 rounded-xl ${hoverBg} ${textSub}`}>
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-5 max-h-[60vh] overflow-y-auto">
+                            {step === 1 ? (
+                                /* Step 1: Select Friend */
+                                <div className="space-y-4">
+                                    <p className={`text-sm ${textSub}`}>Select a friend to share your vocabulary with:</p>
+                                    
+                                    {friends.length === 0 ? (
+                                        <div className={`p-8 text-center rounded-2xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                                            <Users className={`w-12 h-12 mx-auto mb-3 ${textSub} opacity-50`} />
+                                            <p className={`font-medium ${textMain}`}>No friends yet</p>
+                                            <p className={`text-sm ${textSub} mt-1`}>Add friends in the Messages section first!</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {friends.map(friend => (
+                                                <button
+                                                    key={friend.id}
+                                                    onClick={() => setSelectedFriend(friend)}
+                                                    className={`w-full p-3 rounded-xl transition-all flex items-center gap-3 ${
+                                                        selectedFriend?.id === friend.id 
+                                                            ? 'bg-indigo-500/20 border-2 border-indigo-500' 
+                                                            : `${hoverBg} border-2 border-transparent`
+                                                    }`}
+                                                >
+                                                    {friend.photoURL ? (
+                                                        <img src={friend.photoURL} className="w-10 h-10 rounded-full" alt="" />
+                                                    ) : (
+                                                        <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                                            <User className="w-5 h-5 text-indigo-500" />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 text-left">
+                                                        <div className={`font-bold text-sm ${textMain}`}>{friend.displayName}</div>
+                                                        <div className={`text-xs ${textSub}`}>{friend.email}</div>
+                                                    </div>
+                                                    {selectedFriend?.id === friend.id && (
+                                                        <Check className="w-5 h-5 text-indigo-500" />
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                /* Step 2: Select Content */
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        {selectedFriend?.photoURL ? (
+                                            <img src={selectedFriend.photoURL} className="w-8 h-8 rounded-full" alt="" />
+                                        ) : (
+                                            <div className={`w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center`}>
+                                                <User className="w-4 h-4 text-indigo-500" />
+                                            </div>
+                                        )}
+                                        <span className={`text-sm ${textSub}`}>Sharing with <span className={`font-bold ${textMain}`}>{selectedFriend?.displayName}</span></span>
+                                    </div>
+
+                                    {/* Type Filter */}
+                                    <div className={`flex flex-wrap gap-2 p-1 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                                        {[
+                                            { value: 'all', label: 'All', icon: Layers },
+                                            { value: 'voca', label: 'Vocab', icon: Book },
+                                            { value: 'synonym', label: 'Syn', icon: LinkIcon },
+                                            { value: 'antonym', label: 'Ant', icon: ArrowLeftRight },
+                                            { value: 'phrase', label: 'Phr', icon: MessageCircle }
+                                        ].map(({ value, label, icon: Icon }) => (
+                                            <button
+                                                key={value}
+                                                onClick={() => { setSelectedType(value); setSelectedItems([]); }}
+                                                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                                                    selectedType === value
+                                                        ? theme === 'dark' 
+                                                            ? 'bg-indigo-500 text-white' 
+                                                            : 'bg-white text-indigo-600 shadow'
+                                                        : textSub
+                                                }`}
+                                            >
+                                                <Icon className="w-3 h-3" />
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Select All */}
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-sm ${textSub}`}>{filteredItems.length} items available</span>
+                                        <button
+                                            onClick={selectAllItems}
+                                            className={`text-xs font-bold px-3 py-1.5 rounded-lg ${theme === 'dark' ? 'bg-slate-800 text-indigo-400 hover:bg-slate-700' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'} transition-colors`}
+                                        >
+                                            {selectedItems.length === filteredItems.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    </div>
+
+                                    {/* Items List */}
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {filteredItems.length === 0 ? (
+                                            <div className={`p-4 text-center ${textSub}`}>
+                                                <p className="text-sm">No items in this category</p>
+                                            </div>
+                                        ) : (
+                                            filteredItems.map(item => (
+                                                <button
+                                                    key={item.id}
+                                                    onClick={() => toggleItemSelection(item.id)}
+                                                    className={`w-full p-3 rounded-xl transition-all flex items-center gap-3 ${
+                                                        selectedItems.includes(item.id)
+                                                            ? 'bg-indigo-500/20 border-2 border-indigo-500'
+                                                            : `${hoverBg} border-2 border-transparent`
+                                                    }`}
+                                                >
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getTypeColor(item.type)}`}>
+                                                        {getTypeIcon(item.type)}
+                                                    </div>
+                                                    <div className="flex-1 text-left min-w-0">
+                                                        <div className={`font-bold text-sm truncate ${textMain}`}>{item.mainText}</div>
+                                                        <div className={`text-xs truncate ${textSub}`}>
+                                                            {item.type === 'voca' && (item.context || item.pos)}
+                                                            {item.type === 'synonym' && item.related?.join(', ')}
+                                                            {item.type === 'antonym' && item.related?.[0]}
+                                                            {item.type === 'phrase' && item.context}
+                                                        </div>
+                                                    </div>
+                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                                        selectedItems.includes(item.id)
+                                                            ? 'bg-indigo-500 border-indigo-500'
+                                                            : theme === 'dark' ? 'border-slate-600' : 'border-slate-300'
+                                                    }`}>
+                                                        {selectedItems.includes(item.id) && <Check className="w-3 h-3 text-white" />}
+                                                    </div>
+                                                </button>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {/* Optional Message */}
+                                    <div className="space-y-2">
+                                        <label className={`text-xs uppercase tracking-widest ${textSub} font-bold`}>Message (optional)</label>
+                                        <input
+                                            type="text"
+                                            value={message}
+                                            onChange={e => setMessage(e.target.value)}
+                                            placeholder="Add a note..."
+                                            className={`w-full px-4 py-3 rounded-xl border ${inputBg} outline-none focus:ring-2 focus:ring-indigo-500/50`}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className={`p-5 border-t ${borderColor} flex gap-3`}>
+                            {step === 1 ? (
+                                <>
+                                    <button
+                                        onClick={onClose}
+                                        className={`flex-1 py-3 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => setStep(2)}
+                                        disabled={!selectedFriend}
+                                        className="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-600 hover:to-violet-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        Next <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => setStep(1)}
+                                        className={`py-3 px-4 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={sendShareRequest}
+                                        disabled={selectedItems.length === 0 || isSending}
+                                        className="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-600 hover:to-violet-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {isSending ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Send className="w-4 h-4" />
+                                                Share {selectedItems.length} Item{selectedItems.length !== 1 ? 's' : ''}
+                                            </>
+                                        )}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Sharing Inbox - View and accept/reject share requests
+        const SharingInbox = ({ isOpen, onClose, user, theme, onAcceptShare, shareRequests, onDeclineShare }) => {
+            const [expandedRequest, setExpandedRequest] = useState(null);
+            const [processingId, setProcessingId] = useState(null);
+
+            if (!isOpen) return null;
+
+            const panelBg = theme === 'dark' ? 'bg-[#0f172a]/95' : 'bg-white/95';
+            const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+            const textMain = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-slate-400' : 'text-slate-500';
+            const hoverBg = theme === 'dark' ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50';
+
+            const handleAccept = async (request) => {
+                setProcessingId(request.id);
+                await onAcceptShare(request);
+                setProcessingId(null);
+            };
+
+            const handleDecline = async (request) => {
+                setProcessingId(request.id);
+                await onDeclineShare(request.id);
+                setProcessingId(null);
+            };
+
+            const formatTime = (timestamp) => {
+                if (!timestamp) return '';
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 0) {
+                    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else if (diffDays === 1) {
+                    return 'Yesterday';
+                } else if (diffDays < 7) {
+                    return date.toLocaleDateString([], { weekday: 'short' });
+                }
+                return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            };
+
+            const getTypeIcon = (type) => {
+                switch(type) {
+                    case 'voca': return <Book className="w-3 h-3" />;
+                    case 'synonym': return <LinkIcon className="w-3 h-3" />;
+                    case 'antonym': return <ArrowLeftRight className="w-3 h-3" />;
+                    case 'phrase': return <MessageCircle className="w-3 h-3" />;
+                    default: return <FileText className="w-3 h-3" />;
+                }
+            };
+
+            const getTypeCounts = (items) => {
+                const counts = { voca: 0, synonym: 0, antonym: 0, phrase: 0 };
+                items.forEach(item => {
+                    if (counts[item.type] !== undefined) counts[item.type]++;
+                });
+                return counts;
+            };
+
+            return (
+                <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+                    <div 
+                        className={`${panelBg} backdrop-blur-xl w-full max-w-lg rounded-3xl shadow-2xl border ${borderColor} overflow-hidden animate-in zoom-in-95`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className={`p-5 border-b ${borderColor} flex items-center justify-between`}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center relative">
+                                    <Inbox className="w-5 h-5 text-white" />
+                                    {shareRequests.length > 0 && (
+                                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                                            {shareRequests.length}
+                                        </span>
+                                    )}
+                                </div>
+                                <div>
+                                    <h3 className={`font-bold text-lg ${textMain}`}>Sharing Inbox</h3>
+                                    <p className={`text-xs ${textSub}`}>Vocabulary shared with you</p>
+                                </div>
+                            </div>
+                            <button onClick={onClose} className={`p-2 rounded-xl ${hoverBg} ${textSub}`}>
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-4 max-h-[60vh] overflow-y-auto">
+                            {shareRequests.length === 0 ? (
+                                <div className={`p-12 text-center`}>
+                                    <div className={`w-16 h-16 rounded-full ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'} flex items-center justify-center mx-auto mb-4`}>
+                                        <Gift className={`w-8 h-8 ${textSub}`} />
+                                    </div>
+                                    <p className={`font-medium ${textMain}`}>No pending shares</p>
+                                    <p className={`text-sm ${textSub} mt-1`}>When friends share vocabulary with you, it will appear here!</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {shareRequests.map(request => {
+                                        const typeCounts = getTypeCounts(request.items || []);
+                                        const isExpanded = expandedRequest === request.id;
+                                        const isProcessing = processingId === request.id;
+                                        
+                                        return (
+                                            <div 
+                                                key={request.id}
+                                                className={`rounded-2xl border overflow-hidden transition-all ${
+                                                    theme === 'dark' 
+                                                        ? 'bg-slate-800/50 border-slate-700' 
+                                                        : 'bg-white border-slate-200 shadow-sm'
+                                                }`}
+                                            >
+                                                {/* Request Header */}
+                                                <div className="p-4">
+                                                    <div className="flex items-start gap-3">
+                                                        {request.senderPhoto ? (
+                                                            <img src={request.senderPhoto} className="w-11 h-11 rounded-full border-2 border-indigo-500/30" alt="" />
+                                                        ) : (
+                                                            <div className={`w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500/30 to-violet-500/30 flex items-center justify-center`}>
+                                                                <User className="w-5 h-5 text-indigo-500" />
+                                                            </div>
+                                                        )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className={`font-bold ${textMain}`}>{request.senderName}</span>
+                                                                <span className={`text-xs ${textSub}`}>{formatTime(request.timestamp)}</span>
+                                                            </div>
+                                                            <p className={`text-sm ${textSub} mt-0.5`}>
+                                                                Shared <span className="font-semibold text-indigo-500">{request.items?.length || 0} items</span> with you
+                                                            </p>
+                                                            {request.message && (
+                                                                <p className={`text-sm mt-2 italic ${textSub}`}>"{request.message}"</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Type Summary */}
+                                                    <div className="flex flex-wrap gap-2 mt-3">
+                                                        {typeCounts.voca > 0 && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-500 text-xs font-bold">
+                                                                <Book className="w-3 h-3" /> {typeCounts.voca} Vocab
+                                                            </span>
+                                                        )}
+                                                        {typeCounts.synonym > 0 && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-violet-500/10 text-violet-500 text-xs font-bold">
+                                                                <LinkIcon className="w-3 h-3" /> {typeCounts.synonym} Syn
+                                                            </span>
+                                                        )}
+                                                        {typeCounts.antonym > 0 && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-bold">
+                                                                <ArrowLeftRight className="w-3 h-3" /> {typeCounts.antonym} Ant
+                                                            </span>
+                                                        )}
+                                                        {typeCounts.phrase > 0 && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/10 text-amber-500 text-xs font-bold">
+                                                                <MessageCircle className="w-3 h-3" /> {typeCounts.phrase} Phr
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Expand/Collapse Button */}
+                                                    <button
+                                                        onClick={() => setExpandedRequest(isExpanded ? null : request.id)}
+                                                        className={`w-full mt-3 py-2 text-xs font-bold ${textSub} hover:text-indigo-500 transition-colors flex items-center justify-center gap-1`}
+                                                    >
+                                                        {isExpanded ? 'Hide Details' : 'View Items'}
+                                                        <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                </div>
+
+                                                {/* Expanded Items List */}
+                                                {isExpanded && (
+                                                    <div className={`px-4 pb-4 border-t ${borderColor} pt-3`}>
+                                                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                                                            {request.items?.map((item, index) => (
+                                                                <div 
+                                                                    key={index}
+                                                                    className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'} flex items-center gap-2`}
+                                                                >
+                                                                    <span className={`p-1.5 rounded ${
+                                                                        item.type === 'voca' ? 'bg-indigo-500/20 text-indigo-500' :
+                                                                        item.type === 'synonym' ? 'bg-violet-500/20 text-violet-500' :
+                                                                        item.type === 'antonym' ? 'bg-rose-500/20 text-rose-500' :
+                                                                        'bg-amber-500/20 text-amber-500'
+                                                                    }`}>
+                                                                        {getTypeIcon(item.type)}
+                                                                    </span>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className={`font-medium text-sm truncate ${textMain}`}>{item.mainText}</div>
+                                                                        <div className={`text-xs truncate ${textSub}`}>
+                                                                            {item.context || item.related?.join(', ') || item.pos}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Action Buttons */}
+                                                <div className={`flex gap-2 p-4 border-t ${borderColor}`}>
+                                                    <button
+                                                        onClick={() => handleDecline(request)}
+                                                        disabled={isProcessing}
+                                                        className={`flex-1 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 ${
+                                                            theme === 'dark' 
+                                                                ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
+                                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                        }`}
+                                                    >
+                                                        Decline
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleAccept(request)}
+                                                        disabled={isProcessing}
+                                                        className="flex-1 py-2.5 rounded-xl font-bold bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                                    >
+                                                        {isProcessing ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                <Check className="w-4 h-4" />
+                                                                Accept All
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const App = () => {
             const [user, setUser] = useState(null);
             const [items, setItems] = useState([]);
@@ -3470,6 +4169,12 @@ Respond with ONLY the JSON object, nothing else.`
             // Messenger state
             const [isMessengerOpen, setIsMessengerOpen] = useState(false);
             const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
+            
+            // Sharing system state
+            const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+            const [isSharingInboxOpen, setIsSharingInboxOpen] = useState(false);
+            const [shareRequests, setShareRequests] = useState([]);
+            const [friends, setFriends] = useState([]);
 
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -3487,6 +4192,45 @@ Respond with ONLY the JSON object, nothing else.`
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     setItems(data);
                 }, (err) => console.error("Sync Error:", err));
+                return () => unsubscribe();
+            }, [user]);
+
+            // Load friends list for sharing
+            useEffect(() => {
+                if (!user) return;
+                const unsubscribe = onSnapshot(
+                    collection(db, 'artifacts', appId, 'chatUsers', user.uid, 'friends'),
+                    async (snapshot) => {
+                        const friendsData = await Promise.all(snapshot.docs.map(async (docSnap) => {
+                            const friendId = docSnap.id;
+                            try {
+                                const userDoc = await getDoc(doc(db, 'artifacts', appId, 'chatUsers', friendId));
+                                if (userDoc.exists()) {
+                                    return { id: friendId, ...userDoc.data() };
+                                }
+                            } catch (err) {
+                                console.log('Could not fetch friend profile');
+                            }
+                            return null;
+                        }));
+                        setFriends(friendsData.filter(f => f !== null));
+                    }
+                );
+                return () => unsubscribe();
+            }, [user]);
+
+            // Load incoming share requests
+            useEffect(() => {
+                if (!user) return;
+                const unsubscribe = onSnapshot(
+                    collection(db, 'artifacts', appId, 'chatUsers', user.uid, 'shareRequests'),
+                    (snapshot) => {
+                        const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        // Sort by timestamp, newest first
+                        requests.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                        setShareRequests(requests);
+                    }
+                );
                 return () => unsubscribe();
             }, [user]);
 
@@ -3512,6 +4256,44 @@ Respond with ONLY the JSON object, nothing else.`
 
             const handleAdd = async (data) => { if(user) await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), data); };
             const handleDelete = async (id) => { if(user) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id)); };
+            
+            // Accept share request - add items to user's vocabulary
+            const handleAcceptShare = async (request) => {
+                if (!user || !request.items) return;
+                try {
+                    // Add each shared item to the user's vocabulary
+                    for (const item of request.items) {
+                        const { originalId, ...itemData } = item;
+                        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), {
+                            ...itemData,
+                            // Reset spaced repetition values for the new user
+                            easiness: 2.5,
+                            interval: 0,
+                            nextReview: Date.now(),
+                            importedAt: Date.now()
+                        });
+                    }
+                    
+                    // Delete the share request
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'shareRequests', request.id));
+                    
+                    showToast(`Added ${request.items.length} items from ${request.senderName}!`, 'success');
+                } catch (err) {
+                    console.error('Error accepting share:', err);
+                    showToast('Failed to accept share', 'error');
+                }
+            };
+            
+            // Decline share request
+            const handleDeclineShare = async (requestId) => {
+                if (!user) return;
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'shareRequests', requestId));
+                    showToast('Share request declined', 'info');
+                } catch (err) {
+                    console.error('Error declining share:', err);
+                }
+            };
             
             // Show confirmation modal for delete all
             const showDeleteAllConfirm = (type) => { 
@@ -3596,7 +4378,7 @@ Respond with ONLY the JSON object, nothing else.`
                 <div className={`min-h-screen pb-20 selection:bg-indigo-500 selection:text-white relative transition-colors duration-500 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>
                     <div className={`fixed inset-0 z-[-1] ${bgGradient} transition-colors duration-700`}></div>
                     
-                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} setIsMessengerOpen={setIsMessengerOpen} totalUnreadMessages={totalUnreadMessages} />
+                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} setIsMessengerOpen={setIsMessengerOpen} totalUnreadMessages={totalUnreadMessages} setIsShareModalOpen={setIsShareModalOpen} setIsSharingInboxOpen={setIsSharingInboxOpen} shareRequestCount={shareRequests.length} />
                     
                     <main>
                         {activeTab === 'landing' && ( <LandingPage setActiveTab={setActiveTab} theme={theme} /> )}
@@ -3624,6 +4406,25 @@ Respond with ONLY the JSON object, nothing else.`
                     
                     {/* Messenger */}
                     <Messenger isOpen={isMessengerOpen} onClose={() => setIsMessengerOpen(false)} user={user} theme={theme} onUnreadChange={setTotalUnreadMessages} />
+                    
+                    {/* Sharing System */}
+                    <ShareVocabularyModal 
+                        isOpen={isShareModalOpen} 
+                        onClose={() => setIsShareModalOpen(false)} 
+                        user={user} 
+                        items={items} 
+                        friends={friends} 
+                        theme={theme} 
+                    />
+                    <SharingInbox 
+                        isOpen={isSharingInboxOpen} 
+                        onClose={() => setIsSharingInboxOpen(false)} 
+                        user={user} 
+                        theme={theme} 
+                        shareRequests={shareRequests}
+                        onAcceptShare={handleAcceptShare}
+                        onDeclineShare={handleDeclineShare}
+                    />
                 </div>
             );
         };
