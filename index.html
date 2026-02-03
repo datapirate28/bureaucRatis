@@ -181,7 +181,7 @@
             Search, Sparkles, Zap, Layers, Loader2, AlertTriangle, User, 
             LogOut, ShieldCheck, LogIn, ChevronDown, Play, ArrowLeft, Trophy, 
             Book, Mic, Volume2, Wand2, Star, ChevronRight, Activity, Grid, List,
-            Moon, Sun, Upload, Pencil, Send, Users, MessageSquare, Circle
+            Moon, Sun, Upload, Pencil, Send, Users, MessageSquare, Circle, Heart, UserPlus, UserMinus, UserCheck
         } from 'lucide-react';
         
         // Import Firebase
@@ -1798,7 +1798,7 @@ Respond with ONLY the JSON object, nothing else.`
             const [allUsers, setAllUsers] = useState([]);
             const messagesEndRef = useRef(null);
             const [isSending, setIsSending] = useState(false);
-            const [activeTab, setActiveTab] = useState('chats'); // 'chats' or 'users'
+            const [activeTab, setActiveTab] = useState('chats'); // 'chats', 'users', or 'friends'
             const [isLoadingUsers, setIsLoadingUsers] = useState(false);
             const [editingMessage, setEditingMessage] = useState(null);
             const [editMessageText, setEditMessageText] = useState('');
@@ -1808,6 +1808,12 @@ Respond with ONLY the JSON object, nothing else.`
             const [editDisplayName, setEditDisplayName] = useState('');
             const [isSavingProfile, setIsSavingProfile] = useState(false);
             const typingTimeoutRef = useRef(null);
+            const [showDeleteConvoModal, setShowDeleteConvoModal] = useState(false);
+            const [isDeletingConvo, setIsDeletingConvo] = useState(false);
+            const [friends, setFriends] = useState([]);
+            const [friendRequests, setFriendRequests] = useState([]);
+            const [sentRequests, setSentRequests] = useState([]);
+            const [isLoadingFriends, setIsLoadingFriends] = useState(false);
 
             // Scroll to bottom of messages
             const scrollToBottom = () => {
@@ -1928,6 +1934,67 @@ Respond with ONLY the JSON object, nothing else.`
                     // If index error, conversations will just be empty
                 });
                 return () => unsubscribe();
+            }, [user, isOpen]);
+
+            // Load friends and friend requests
+            useEffect(() => {
+                if (!user || !isOpen) return;
+                setIsLoadingFriends(true);
+                
+                // Listen for friends list
+                const friendsUnsubscribe = onSnapshot(
+                    collection(db, 'artifacts', appId, 'chatUsers', user.uid, 'friends'),
+                    async (snapshot) => {
+                        const friendsData = await Promise.all(snapshot.docs.map(async (docSnap) => {
+                            const friendId = docSnap.id;
+                            try {
+                                const userDoc = await getDoc(doc(db, 'artifacts', appId, 'chatUsers', friendId));
+                                if (userDoc.exists()) {
+                                    return { id: friendId, ...userDoc.data(), friendSince: docSnap.data().timestamp };
+                                }
+                            } catch (err) {
+                                console.log('Could not fetch friend profile');
+                            }
+                            return null;
+                        }));
+                        setFriends(friendsData.filter(f => f !== null));
+                        setIsLoadingFriends(false);
+                    }
+                );
+                
+                // Listen for incoming friend requests
+                const requestsUnsubscribe = onSnapshot(
+                    collection(db, 'artifacts', appId, 'chatUsers', user.uid, 'friendRequests'),
+                    async (snapshot) => {
+                        const requestsData = await Promise.all(snapshot.docs.map(async (docSnap) => {
+                            const senderId = docSnap.id;
+                            try {
+                                const userDoc = await getDoc(doc(db, 'artifacts', appId, 'chatUsers', senderId));
+                                if (userDoc.exists()) {
+                                    return { id: senderId, ...userDoc.data(), requestedAt: docSnap.data().timestamp };
+                                }
+                            } catch (err) {
+                                console.log('Could not fetch requester profile');
+                            }
+                            return null;
+                        }));
+                        setFriendRequests(requestsData.filter(r => r !== null));
+                    }
+                );
+                
+                // Listen for sent friend requests
+                const sentUnsubscribe = onSnapshot(
+                    collection(db, 'artifacts', appId, 'chatUsers', user.uid, 'sentRequests'),
+                    (snapshot) => {
+                        setSentRequests(snapshot.docs.map(doc => doc.id));
+                    }
+                );
+                
+                return () => {
+                    friendsUnsubscribe();
+                    requestsUnsubscribe();
+                    sentUnsubscribe();
+                };
             }, [user, isOpen]);
 
             // Load messages for active chat
@@ -2077,9 +2144,12 @@ Respond with ONLY the JSON object, nothing else.`
             const startConversation = async (otherUser) => {
                 if (!user || !otherUser) return;
                 
+                // Handle both uid and id (for friend objects)
+                const otherUserId = otherUser.uid || otherUser.id;
+                
                 // Check if conversation already exists
                 const existingConvo = conversations.find(c => 
-                    c.participants.includes(otherUser.uid)
+                    c.participants.includes(otherUserId)
                 );
                 
                 if (existingConvo) {
@@ -2093,7 +2163,7 @@ Respond with ONLY the JSON object, nothing else.`
                 // Create new conversation
                 try {
                     const convoRef = await addDoc(collection(db, 'artifacts', appId, 'conversations'), {
-                        participants: [user.uid, otherUser.uid],
+                        participants: [user.uid, otherUserId],
                         lastMessage: '',
                         lastMessageTime: Date.now(),
                         createdAt: Date.now()
@@ -2101,8 +2171,8 @@ Respond with ONLY the JSON object, nothing else.`
                     
                     setActiveChat({ 
                         id: convoRef.id, 
-                        participants: [user.uid, otherUser.uid],
-                        otherUser 
+                        participants: [user.uid, otherUserId],
+                        otherUser: { ...otherUser, uid: otherUserId }
                     });
                     setSearchQuery('');
                     setSearchResults([]);
@@ -2166,6 +2236,114 @@ Respond with ONLY the JSON object, nothing else.`
                 return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
             };
 
+            // Delete entire conversation
+            const deleteConversation = async () => {
+                if (!activeChat) return;
+                setIsDeletingConvo(true);
+                try {
+                    // Delete all messages in the conversation
+                    const messagesRef = collection(db, 'artifacts', appId, 'conversations', activeChat.id, 'messages');
+                    const messagesSnap = await getDocs(messagesRef);
+                    const deletePromises = messagesSnap.docs.map(docSnap => 
+                        deleteDoc(doc(db, 'artifacts', appId, 'conversations', activeChat.id, 'messages', docSnap.id))
+                    );
+                    await Promise.all(deletePromises);
+                    
+                    // Delete typing subcollection
+                    const typingRef = collection(db, 'artifacts', appId, 'conversations', activeChat.id, 'typing');
+                    const typingSnap = await getDocs(typingRef);
+                    const typingDeletePromises = typingSnap.docs.map(docSnap =>
+                        deleteDoc(doc(db, 'artifacts', appId, 'conversations', activeChat.id, 'typing', docSnap.id))
+                    );
+                    await Promise.all(typingDeletePromises);
+                    
+                    // Delete the conversation document
+                    await deleteDoc(doc(db, 'artifacts', appId, 'conversations', activeChat.id));
+                    
+                    setActiveChat(null);
+                    setMessages([]);
+                    setShowDeleteConvoModal(false);
+                } catch (err) {
+                    console.error('Error deleting conversation:', err);
+                }
+                setIsDeletingConvo(false);
+            };
+
+            // Send friend request
+            const sendFriendRequest = async (targetUserId) => {
+                if (!user || !targetUserId) return;
+                try {
+                    // Add to target user's friend requests
+                    await setDoc(doc(db, 'artifacts', appId, 'chatUsers', targetUserId, 'friendRequests', user.uid), {
+                        timestamp: Date.now()
+                    });
+                    // Add to sender's sent requests
+                    await setDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'sentRequests', targetUserId), {
+                        timestamp: Date.now()
+                    });
+                } catch (err) {
+                    console.error('Error sending friend request:', err);
+                }
+            };
+
+            // Accept friend request
+            const acceptFriendRequest = async (requesterId) => {
+                if (!user || !requesterId) return;
+                try {
+                    // Add each other as friends
+                    await setDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'friends', requesterId), {
+                        timestamp: Date.now()
+                    });
+                    await setDoc(doc(db, 'artifacts', appId, 'chatUsers', requesterId, 'friends', user.uid), {
+                        timestamp: Date.now()
+                    });
+                    
+                    // Remove the friend request
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'friendRequests', requesterId));
+                    // Remove from sender's sent requests
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', requesterId, 'sentRequests', user.uid));
+                } catch (err) {
+                    console.error('Error accepting friend request:', err);
+                }
+            };
+
+            // Reject/cancel friend request
+            const rejectFriendRequest = async (requesterId, isSent = false) => {
+                if (!user || !requesterId) return;
+                try {
+                    if (isSent) {
+                        // Cancel sent request
+                        await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', requesterId, 'friendRequests', user.uid));
+                        await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'sentRequests', requesterId));
+                    } else {
+                        // Reject incoming request
+                        await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'friendRequests', requesterId));
+                        await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', requesterId, 'sentRequests', user.uid));
+                    }
+                } catch (err) {
+                    console.error('Error rejecting friend request:', err);
+                }
+            };
+
+            // Remove friend
+            const removeFriend = async (friendId) => {
+                if (!user || !friendId) return;
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid, 'friends', friendId));
+                    await deleteDoc(doc(db, 'artifacts', appId, 'chatUsers', friendId, 'friends', user.uid));
+                } catch (err) {
+                    console.error('Error removing friend:', err);
+                }
+            };
+
+            // Check friendship status
+            const getFriendshipStatus = (userId) => {
+                if (friends.some(f => f.id === userId)) return 'friends';
+                if (sentRequests.includes(userId)) return 'pending';
+                if (friendRequests.some(r => r.id === userId)) return 'incoming';
+                return 'none';
+            };
+
             if (!isOpen) return null;
 
             const panelBg = theme === 'dark' ? 'bg-[#0f172a]/95' : 'bg-white/95';
@@ -2203,7 +2381,7 @@ Respond with ONLY the JSON object, nothing else.`
                                 <div className={`flex gap-1 p-1 rounded-xl mb-3 ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
                                     <button
                                         onClick={() => setActiveTab('chats')}
-                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                                        className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                                             activeTab === 'chats'
                                                 ? theme === 'dark' 
                                                     ? 'bg-indigo-500 text-white shadow-lg' 
@@ -2213,12 +2391,32 @@ Respond with ONLY the JSON object, nothing else.`
                                                     : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                     >
-                                        <MessageCircle className="w-4 h-4" />
+                                        <MessageCircle className="w-3.5 h-3.5" />
                                         Chats
                                     </button>
                                     <button
+                                        onClick={() => setActiveTab('friends')}
+                                        className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 relative ${
+                                            activeTab === 'friends'
+                                                ? theme === 'dark' 
+                                                    ? 'bg-indigo-500 text-white shadow-lg' 
+                                                    : 'bg-white text-indigo-600 shadow-md'
+                                                : theme === 'dark'
+                                                    ? 'text-slate-400 hover:text-white'
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        <Heart className="w-3.5 h-3.5" />
+                                        Friends
+                                        {friendRequests.length > 0 && (
+                                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse">
+                                                {friendRequests.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button
                                         onClick={() => setActiveTab('users')}
-                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                                        className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
                                             activeTab === 'users'
                                                 ? theme === 'dark' 
                                                     ? 'bg-indigo-500 text-white shadow-lg' 
@@ -2228,8 +2426,8 @@ Respond with ONLY the JSON object, nothing else.`
                                                     : 'text-slate-500 hover:text-slate-700'
                                         }`}
                                     >
-                                        <Users className="w-4 h-4" />
-                                        Users ({allUsers.length})
+                                        <Users className="w-3.5 h-3.5" />
+                                        Users
                                     </button>
                                 </div>
                                 
@@ -2248,7 +2446,177 @@ Respond with ONLY the JSON object, nothing else.`
 
                             {/* Content based on active tab */}
                             <div className="flex-1 overflow-y-auto">
-                                {activeTab === 'users' ? (
+                                {activeTab === 'friends' ? (
+                                    /* Friends Tab */
+                                    <div className="p-2">
+                                        {isLoadingFriends ? (
+                                            <div className={`p-8 text-center ${textSub}`}>
+                                                <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin text-indigo-500" />
+                                                <p className="text-sm">Loading friends...</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {/* Friend Requests Section */}
+                                                {friendRequests.length > 0 && (
+                                                    <div className="mb-4">
+                                                        <div className={`text-xs font-bold uppercase tracking-wider px-2 py-2 flex items-center gap-2 ${textSub}`}>
+                                                            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                                            Friend Requests ({friendRequests.length})
+                                                        </div>
+                                                        {friendRequests.map(request => (
+                                                            <div key={request.id} className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-100'} mb-2 animate-in slide-in-from-left`}>
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="relative">
+                                                                        {request.photoURL ? (
+                                                                            <img src={request.photoURL} className="w-10 h-10 rounded-full border-2 border-indigo-500/30" alt="" />
+                                                                        ) : (
+                                                                            <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500/30 to-violet-500/30 flex items-center justify-center`}>
+                                                                                <User className="w-5 h-5 text-indigo-500" />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className={`font-bold text-sm truncate ${textMain}`}>{request.displayName}</div>
+                                                                        <div className={`text-xs ${textSub}`}>Wants to be friends</div>
+                                                                    </div>
+                                                                    <div className="flex gap-1">
+                                                                        <button
+                                                                            onClick={() => acceptFriendRequest(request.id)}
+                                                                            className="p-2 rounded-lg bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30 transition-colors"
+                                                                            title="Accept"
+                                                                        >
+                                                                            <Check className="w-4 h-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => rejectFriendRequest(request.id)}
+                                                                            className="p-2 rounded-lg bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
+                                                                            title="Decline"
+                                                                        >
+                                                                            <X className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Friends List */}
+                                                <div className={`text-xs font-bold uppercase tracking-wider px-2 py-2 ${textSub}`}>
+                                                    <Heart className="w-3 h-3 inline mr-1" />
+                                                    Your Friends ({friends.length})
+                                                </div>
+                                                {friends.length === 0 ? (
+                                                    <div className={`p-8 text-center ${textSub}`}>
+                                                        <Heart className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                                        <p className="text-sm font-medium">No friends yet</p>
+                                                        <p className="text-xs mt-1">Go to Users tab to add friends!</p>
+                                                        <button 
+                                                            onClick={() => setActiveTab('users')}
+                                                            className={`mt-4 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                                                                theme === 'dark' 
+                                                                    ? 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30' 
+                                                                    : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
+                                                            }`}
+                                                        >
+                                                            <UserPlus className="w-4 h-4 inline mr-2" />
+                                                            Find Friends
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    friends
+                                                        .filter(f => 
+                                                            !searchQuery || 
+                                                            f.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
+                                                        )
+                                                        .map(friend => {
+                                                            const isOnline = friend.lastSeen && (Date.now() - friend.lastSeen) < 5 * 60 * 1000;
+                                                            return (
+                                                                <div
+                                                                    key={friend.id}
+                                                                    className={`w-full p-3 rounded-xl ${hoverBg} transition-all flex items-center gap-3 group`}
+                                                                >
+                                                                    <div className="relative">
+                                                                        {friend.photoURL ? (
+                                                                            <img src={friend.photoURL} className="w-11 h-11 rounded-full border-2 border-white/20" alt="" />
+                                                                        ) : (
+                                                                            <div className={`w-11 h-11 rounded-full ${theme === 'dark' ? 'bg-gradient-to-br from-indigo-500/30 to-violet-500/30' : 'bg-gradient-to-br from-indigo-100 to-violet-100'} flex items-center justify-center`}>
+                                                                                <User className="w-5 h-5 text-indigo-500" />
+                                                                            </div>
+                                                                        )}
+                                                                        <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 ${theme === 'dark' ? 'border-[#0f172a]' : 'border-white'} ${isOnline ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+                                                                    </div>
+                                                                    <div className="flex-1 text-left min-w-0">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className={`font-bold text-sm truncate ${textMain}`}>{friend.displayName}</span>
+                                                                            <Heart className="w-3 h-3 text-pink-500 fill-pink-500" />
+                                                                        </div>
+                                                                        <div className={`text-xs truncate ${textSub}`}>
+                                                                            {isOnline ? (
+                                                                                <span className="text-emerald-500 font-medium">● Online now</span>
+                                                                            ) : friend.lastSeen ? (
+                                                                                `Last seen ${formatTime(friend.lastSeen)}`
+                                                                            ) : (
+                                                                                'Friend'
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button
+                                                                            onClick={() => startConversation(friend)}
+                                                                            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-indigo-500/20 hover:bg-indigo-500/30' : 'bg-indigo-100 hover:bg-indigo-200'} transition-colors`}
+                                                                            title="Message"
+                                                                        >
+                                                                            <Send className="w-4 h-4 text-indigo-500" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => removeFriend(friend.id)}
+                                                                            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-red-500/20 hover:bg-red-500/30' : 'bg-red-100 hover:bg-red-200'} transition-colors`}
+                                                                            title="Remove Friend"
+                                                                        >
+                                                                            <UserMinus className="w-4 h-4 text-red-500" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })
+                                                )}
+
+                                                {/* Sent Requests */}
+                                                {sentRequests.length > 0 && (
+                                                    <div className="mt-4">
+                                                        <div className={`text-xs font-bold uppercase tracking-wider px-2 py-2 ${textSub}`}>
+                                                            Pending Requests ({sentRequests.length})
+                                                        </div>
+                                                        {allUsers.filter(u => sentRequests.includes(u.uid)).map(pendingUser => (
+                                                            <div key={pendingUser.uid} className={`p-3 rounded-xl ${hoverBg} flex items-center gap-3`}>
+                                                                <div className="relative">
+                                                                    {pendingUser.photoURL ? (
+                                                                        <img src={pendingUser.photoURL} className="w-10 h-10 rounded-full opacity-70" alt="" />
+                                                                    ) : (
+                                                                        <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} flex items-center justify-center opacity-70`}>
+                                                                            <User className="w-5 h-5 text-slate-500" />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className={`font-medium text-sm truncate ${textMain} opacity-70`}>{pendingUser.displayName}</div>
+                                                                    <div className={`text-xs ${textSub}`}>Request pending...</div>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => rejectFriendRequest(pendingUser.uid, true)}
+                                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium ${theme === 'dark' ? 'bg-slate-700 text-slate-400 hover:bg-slate-600' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'} transition-colors`}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ) : activeTab === 'users' ? (
                                     /* Users Tab */
                                     <div className="p-2">
                                         {isLoadingUsers ? (
@@ -2280,10 +2648,10 @@ Respond with ONLY the JSON object, nothing else.`
                                                     .map(userItem => {
                                                         const isOnline = userItem.lastSeen && (Date.now() - userItem.lastSeen) < 5 * 60 * 1000;
                                                         const hasConversation = conversations.some(c => c.participants.includes(userItem.uid));
+                                                        const friendStatus = getFriendshipStatus(userItem.uid);
                                                         return (
-                                                            <button
+                                                            <div
                                                                 key={userItem.uid}
-                                                                onClick={() => startConversation(userItem)}
                                                                 className={`w-full p-3 rounded-xl ${hoverBg} transition-all flex items-center gap-3 group`}
                                                             >
                                                                 <div className="relative">
@@ -2300,6 +2668,9 @@ Respond with ONLY the JSON object, nothing else.`
                                                                 <div className="flex-1 text-left min-w-0">
                                                                     <div className="flex items-center gap-2">
                                                                         <span className={`font-bold text-sm truncate ${textMain}`}>{userItem.displayName}</span>
+                                                                        {friendStatus === 'friends' && (
+                                                                            <Heart className="w-3 h-3 text-pink-500 fill-pink-500" />
+                                                                        )}
                                                                         {hasConversation && (
                                                                             <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
                                                                                 Chatting
@@ -2316,10 +2687,50 @@ Respond with ONLY the JSON object, nothing else.`
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                                <div className={`opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'}`}>
-                                                                    <Send className="w-4 h-4 text-indigo-500" />
+                                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <button
+                                                                        onClick={() => startConversation(userItem)}
+                                                                        className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-indigo-500/20 hover:bg-indigo-500/30' : 'bg-indigo-100 hover:bg-indigo-200'} transition-colors`}
+                                                                        title="Message"
+                                                                    >
+                                                                        <Send className="w-4 h-4 text-indigo-500" />
+                                                                    </button>
+                                                                    {friendStatus === 'none' && (
+                                                                        <button
+                                                                            onClick={() => sendFriendRequest(userItem.uid)}
+                                                                            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-pink-500/20 hover:bg-pink-500/30' : 'bg-pink-100 hover:bg-pink-200'} transition-colors`}
+                                                                            title="Add Friend"
+                                                                        >
+                                                                            <UserPlus className="w-4 h-4 text-pink-500" />
+                                                                        </button>
+                                                                    )}
+                                                                    {friendStatus === 'pending' && (
+                                                                        <button
+                                                                            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} cursor-default`}
+                                                                            title="Request Pending"
+                                                                        >
+                                                                            <Clock className="w-4 h-4 text-slate-500" />
+                                                                        </button>
+                                                                    )}
+                                                                    {friendStatus === 'incoming' && (
+                                                                        <button
+                                                                            onClick={() => acceptFriendRequest(userItem.uid)}
+                                                                            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-emerald-500/20 hover:bg-emerald-500/30' : 'bg-emerald-100 hover:bg-emerald-200'} transition-colors`}
+                                                                            title="Accept Request"
+                                                                        >
+                                                                            <UserCheck className="w-4 h-4 text-emerald-500" />
+                                                                        </button>
+                                                                    )}
+                                                                    {friendStatus === 'friends' && (
+                                                                        <button
+                                                                            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-pink-500/20' : 'bg-pink-100'} cursor-default`}
+                                                                            title="Friends"
+                                                                        >
+                                                                            <Heart className="w-4 h-4 text-pink-500 fill-pink-500" />
+                                                                        </button>
+                                                                    )}
                                                                 </div>
-                                                            </button>
+                                                            </div>
                                                         );
                                                     })}
                                             </>
@@ -2462,13 +2873,22 @@ Respond with ONLY the JSON object, nothing else.`
                                                 </div>
                                             </div>
                                         </div>
-                                        <button 
-                                            onClick={() => { setEditDisplayName(user?.displayName || ''); setShowProfileEdit(true); }}
-                                            className={`p-2 rounded-xl ${hoverBg} transition-colors ${textSub} hover:text-indigo-500`}
-                                            title="Edit your profile name"
-                                        >
-                                            <Pencil className="w-4 h-4" />
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <button 
+                                                onClick={() => { setEditDisplayName(user?.displayName || ''); setShowProfileEdit(true); }}
+                                                className={`p-2 rounded-xl ${hoverBg} transition-colors ${textSub} hover:text-indigo-500`}
+                                                title="Edit your profile name"
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => setShowDeleteConvoModal(true)}
+                                                className={`p-2 rounded-xl ${hoverBg} transition-colors ${textSub} hover:text-red-500`}
+                                                title="Delete conversation"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Profile Edit Modal */}
@@ -2498,6 +2918,38 @@ Respond with ONLY the JSON object, nothing else.`
                                                     >
                                                         {isSavingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                                                         Save
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Delete Conversation Modal */}
+                                    {showDeleteConvoModal && (
+                                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-3xl" onClick={() => setShowDeleteConvoModal(false)}>
+                                            <div className={`${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-6 rounded-2xl border shadow-2xl w-80 animate-in zoom-in-95`} onClick={e => e.stopPropagation()}>
+                                                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                                                    <Trash2 className="w-6 h-6 text-red-500" />
+                                                </div>
+                                                <h3 className={`text-lg font-bold mb-2 text-center ${textMain}`}>Delete Conversation?</h3>
+                                                <p className={`text-sm mb-4 text-center ${textSub}`}>
+                                                    This will permanently delete all messages with {activeChat.otherUser?.displayName || 'this user'}. This action cannot be undone.
+                                                </p>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setShowDeleteConvoModal(false)}
+                                                        disabled={isDeletingConvo}
+                                                        className={`flex-1 py-2.5 rounded-xl font-bold transition-all ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} disabled:opacity-50`}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={deleteConversation}
+                                                        disabled={isDeletingConvo}
+                                                        className="flex-1 py-2.5 rounded-xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                                    >
+                                                        {isDeletingConvo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                        Delete
                                                     </button>
                                                 </div>
                                             </div>
