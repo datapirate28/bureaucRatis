@@ -205,8 +205,24 @@
 <body class="font-sans overflow-x-hidden transition-colors duration-500">
     <div id="root"></div>
 
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration & Install Prompt -->
     <script>
+        // Store the install prompt for later use
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('beforeinstallprompt fired');
+            e.preventDefault();
+            deferredPrompt = e;
+            // Show your own install button or notification here if desired
+            console.log('App is installable!');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('App was installed');
+            deferredPrompt = null;
+        });
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
