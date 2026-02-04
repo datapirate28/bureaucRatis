@@ -891,6 +891,7 @@
                                 </div>
                                 <div className="space-y-2">
                                     <button onClick={() => { onFlashcards('voca'); setShowFlashcardModal(false); }} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-indigo-100"><Book className="w-5 h-5"/> Vocabulary</button>
+                                    <button onClick={() => { onFlashcards('recieved'); setShowFlashcardModal(false); }} className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-emerald-100"><Share2 className="w-5 h-5"/> Recieved Words</button>
                                     <button onClick={() => { onFlashcards('synonym'); setShowFlashcardModal(false); }} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-indigo-100"><LinkIcon className="w-5 h-5"/> Synonyms</button>
                                     <button onClick={() => { onFlashcards('antonym'); setShowFlashcardModal(false); }} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-rose-100"><ArrowLeftRight className="w-5 h-5"/> Antonyms</button>
                                     <button onClick={() => { onFlashcards('phrase'); setShowFlashcardModal(false); }} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl flex items-center justify-center gap-3 transition-colors border border-indigo-100"><MessageCircle className="w-5 h-5"/> Phrases</button>
@@ -1868,7 +1869,7 @@ Respond with ONLY the JSON object, nothing else.`
                 { id: 'synonym', label: 'Synonyms', icon: LinkIcon, color: 'from-violet-500 to-purple-500', count: items.filter(i => i.type === 'synonym' && !i.sharedBy).length },
                 { id: 'antonym', label: 'Antonyms', icon: ArrowLeftRight, color: 'from-rose-500 to-pink-500', count: items.filter(i => i.type === 'antonym' && !i.sharedBy).length },
                 { id: 'phrase', label: 'Phrases', icon: MessageCircle, color: 'from-amber-400 to-orange-500', count: items.filter(i => i.type === 'phrase' && !i.sharedBy).length },
-                { id: 'shared', label: 'Shared Words', icon: Share2, color: 'from-emerald-500 to-teal-500', count: items.filter(i => i.sharedBy).length },
+                { id: 'shared', label: 'Recieved Words', icon: Share2, color: 'from-emerald-500 to-teal-500', count: items.filter(i => i.sharedBy).length },
             ];
 
             const cardBg = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
@@ -2023,7 +2024,7 @@ Respond with ONLY the JSON object, nothing else.`
                         </div>
                     </div>
 
-                    {/* Add New Entry Section - Dropdown Forms (Hidden for Shared Words) */}
+                    {/* Add New Entry Section - Dropdown Forms (Hidden for Recieved Words) */}
                     {activeCategory !== 'shared' && (
                     <div className={`${cardBg} rounded-[2.5rem] shadow-xl overflow-hidden`}>
                         {/* Dropdown Toggle Button */}
