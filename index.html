@@ -542,7 +542,7 @@
             </div>
         );
 
-        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages, setIsShareModalOpen, setIsSharingInboxOpen, shareRequestCount }) => {
+        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages, setIsShareModalOpen, setIsSharingInboxOpen, shareRequestCount, setIsProfileModalOpen }) => {
             // Build nav items - include Admin tab only for admin user
             const navItems = [
                 { id: 'dashboard', label: 'Dashboard', icon: Grid },
@@ -656,7 +656,10 @@
                                                     <div className="text-left"><div className="text-[10px] text-slate-500 font-bold uppercase">Words</div><div className={`text-xl font-black leading-none ${theme==='dark'?'text-indigo-400':'text-indigo-600'}`}>{items?.length || 0}</div></div>
                                                     <div className={`text-left border-l ${theme==='dark'?'border-white/10':'border-slate-200'} pl-3`}><div className="text-[10px] text-slate-500 font-bold uppercase">Streak</div><div className="text-xl font-black text-orange-500 leading-none">🔥 {streak}</div></div>
                                                 </div>
-                                                <button onClick={onLogout} className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all hover:scale-[1.02] shadow-lg ${theme==='dark'?'bg-indigo-600 text-white hover:bg-indigo-500':'bg-slate-900 text-white hover:bg-slate-800'}`}><LogOut className="w-3 h-3" /> Sign Out</button>
+                                                <div className="space-y-2">
+                                                    <button onClick={() => setIsProfileModalOpen(true)} className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all hover:scale-[1.02] ${theme==='dark'?'bg-white/5 border border-white/10 text-white hover:bg-white/10':'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}><User className="w-3 h-3" /> View Profile</button>
+                                                    <button onClick={onLogout} className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all hover:scale-[1.02] shadow-lg ${theme==='dark'?'bg-indigo-600 text-white hover:bg-indigo-500':'bg-slate-900 text-white hover:bg-slate-800'}`}><LogOut className="w-3 h-3" /> Sign Out</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -2432,7 +2435,7 @@ Respond with ONLY the JSON object, nothing else.`
         // --- PEERS COMPONENT - SOCIAL LEARNING ---
         // Guidelines: Every user can create posts. All posts are visible to everyone (no friend restriction).
         // Users can edit and delete their own posts.
-        const Peers = ({ user, theme }) => {
+        const Peers = ({ user, theme, onViewProfile }) => {
             const [posts, setPosts] = useState([]);
             const [newPost, setNewPost] = useState('');
             const [postType, setPostType] = useState('general'); // general, vocabulary, phrase, tip
@@ -3106,16 +3109,28 @@ Respond with ONLY the JSON object, nothing else.`
                                         )}
                                         
                                         <div className="flex items-start gap-3 sm:gap-4">
-                                            {post.authorPhoto ? (
-                                                <img src={post.authorPhoto} className="w-9 h-9 sm:w-11 sm:h-11 rounded-full ring-2 ring-indigo-500/20 flex-shrink-0" alt="" />
-                                            ) : (
-                                                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-sm sm:text-base flex-shrink-0">
-                                                    {post.authorName?.charAt(0) || '?'}
-                                                </div>
-                                            )}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onViewProfile && onViewProfile({ uid: post.authorId, displayName: post.authorName, photoURL: post.authorPhoto }); }}
+                                                className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                                                title={`View ${post.authorName}'s profile`}
+                                            >
+                                                {post.authorPhoto ? (
+                                                    <img src={post.authorPhoto} className="w-9 h-9 sm:w-11 sm:h-11 rounded-full ring-2 ring-indigo-500/20" alt="" />
+                                                ) : (
+                                                    <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-sm sm:text-base">
+                                                        {post.authorName?.charAt(0) || '?'}
+                                                    </div>
+                                                )}
+                                            </button>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pr-16 sm:pr-20">
-                                                    <span className={`font-bold text-sm sm:text-base ${textColor}`}>{post.authorName}</span>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onViewProfile && onViewProfile({ uid: post.authorId, displayName: post.authorName, photoURL: post.authorPhoto }); }}
+                                                        className={`font-bold text-sm sm:text-base ${textColor} hover:text-indigo-500 transition-colors`}
+                                                        title={`View ${post.authorName}'s profile`}
+                                                    >
+                                                        {post.authorName}
+                                                    </button>
                                                     {post.editedAt && <span className={`text-[10px] sm:text-xs ${textSub}`}>(edited)</span>}
                                                     <span className={`text-[10px] sm:text-xs ${textSub}`}>•</span>
                                                     <span className={`text-[10px] sm:text-xs ${textSub}`}>{formatTime(post.createdAt)}</span>
@@ -3543,7 +3558,7 @@ Respond with ONLY the JSON object, nothing else.`
         );
 
         // --- MESSENGER COMPONENT ---
-        const Messenger = ({ isOpen, onClose, user, theme, onUnreadChange }) => {
+        const Messenger = ({ isOpen, onClose, user, theme, onUnreadChange, onViewProfile }) => {
             const [conversations, setConversations] = useState([]);
             const [activeChat, setActiveChat] = useState(null);
             const [messages, setMessages] = useState([]);
@@ -4498,6 +4513,13 @@ Respond with ONLY the JSON object, nothing else.`
                                                                     </div>
                                                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                         <button
+                                                                            onClick={() => onViewProfile && onViewProfile(friend)}
+                                                                            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-violet-500/20 hover:bg-violet-500/30' : 'bg-violet-100 hover:bg-violet-200'} transition-colors`}
+                                                                            title="View Profile"
+                                                                        >
+                                                                            <Eye className="w-4 h-4 text-violet-500" />
+                                                                        </button>
+                                                                        <button
                                                                             onClick={() => startConversation(friend)}
                                                                             className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-indigo-500/20 hover:bg-indigo-500/30' : 'bg-indigo-100 hover:bg-indigo-200'} transition-colors`}
                                                                             title="Message"
@@ -4791,15 +4813,27 @@ Respond with ONLY the JSON object, nothing else.`
                                             >
                                                 <ArrowLeft className="w-5 h-5" />
                                             </button>
-                                            {activeChat.otherUser?.photoURL ? (
-                                                <img src={activeChat.otherUser.photoURL} className="w-10 h-10 rounded-full" alt="" />
-                                            ) : (
-                                                <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
-                                                    <User className="w-5 h-5 text-indigo-500" />
-                                                </div>
-                                            )}
+                                            <button
+                                                onClick={() => onViewProfile && onViewProfile(activeChat.otherUser)}
+                                                className="hover:opacity-80 transition-opacity"
+                                                title={`View ${activeChat.otherUser?.displayName || 'User'}'s profile`}
+                                            >
+                                                {activeChat.otherUser?.photoURL ? (
+                                                    <img src={activeChat.otherUser.photoURL} className="w-10 h-10 rounded-full" alt="" />
+                                                ) : (
+                                                    <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                                        <User className="w-5 h-5 text-indigo-500" />
+                                                    </div>
+                                                )}
+                                            </button>
                                             <div>
-                                                <div className={`font-bold ${textMain}`}>{activeChat.otherUser?.displayName || 'User'}</div>
+                                                <button
+                                                    onClick={() => onViewProfile && onViewProfile(activeChat.otherUser)}
+                                                    className={`font-bold ${textMain} hover:text-indigo-500 transition-colors`}
+                                                    title={`View ${activeChat.otherUser?.displayName || 'User'}'s profile`}
+                                                >
+                                                    {activeChat.otherUser?.displayName || 'User'}
+                                                </button>
                                                 <div className={`text-xs ${textSub}`}>
                                                     {otherUserTyping ? (
                                                         <span className="text-indigo-500 flex items-center gap-1">
@@ -5188,6 +5222,541 @@ Respond with ONLY the JSON object, nothing else.`
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- USER PROFILE MODAL ---
+        // Modal for viewing and editing user profile, showing statistics
+        const UserProfileModal = ({ isOpen, onClose, user, theme, items, onSaveProfile }) => {
+            const [isEditing, setIsEditing] = useState(false);
+            const [editData, setEditData] = useState({
+                displayName: '',
+                bio: '',
+                location: ''
+            });
+            const [isSaving, setIsSaving] = useState(false);
+            const [profileData, setProfileData] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+
+            // Calculate statistics from items
+            const stats = useMemo(() => {
+                if (!items) return { total: 0, mastered: 0, learning: 0, vocaCount: 0, phraseCount: 0, synonymCount: 0, antonymCount: 0, vocaMastered: 0, phraseMastered: 0, synonymMastered: 0, antonymMastered: 0 };
+
+                const total = items.length;
+                const mastered = items.filter(i => i.interval > 21).length;
+                const learning = total - mastered;
+
+                const vocaItems = items.filter(i => i.type === 'voca');
+                const phraseItems = items.filter(i => i.type === 'phrase');
+                const synonymItems = items.filter(i => i.type === 'synonym');
+                const antonymItems = items.filter(i => i.type === 'antonym');
+
+                return {
+                    total,
+                    mastered,
+                    learning,
+                    vocaCount: vocaItems.length,
+                    phraseCount: phraseItems.length,
+                    synonymCount: synonymItems.length,
+                    antonymCount: antonymItems.length,
+                    vocaMastered: vocaItems.filter(i => i.interval > 21).length,
+                    phraseMastered: phraseItems.filter(i => i.interval > 21).length,
+                    synonymMastered: synonymItems.filter(i => i.interval > 21).length,
+                    antonymMastered: antonymItems.filter(i => i.interval > 21).length
+                };
+            }, [items]);
+
+            // Load profile data
+            useEffect(() => {
+                if (!user || !isOpen) return;
+                setIsLoading(true);
+
+                const loadProfile = async () => {
+                    try {
+                        const profileDoc = await getDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid));
+                        if (profileDoc.exists()) {
+                            const data = profileDoc.data();
+                            setProfileData(data);
+                            setEditData({
+                                displayName: data.displayName || user.displayName || '',
+                                bio: data.bio || '',
+                                location: data.location || ''
+                            });
+                        } else {
+                            setEditData({
+                                displayName: user.displayName || '',
+                                bio: '',
+                                location: ''
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Error loading profile:', err);
+                    }
+                    setIsLoading(false);
+                };
+
+                loadProfile();
+            }, [user, isOpen]);
+
+            const handleSave = async () => {
+                if (!user || !editData.displayName.trim()) return;
+                setIsSaving(true);
+
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'chatUsers', user.uid), {
+                        uid: user.uid,
+                        displayName: editData.displayName.trim(),
+                        bio: editData.bio.trim(),
+                        location: editData.location.trim(),
+                        photoURL: user.photoURL || '',
+                        email: user.email || '',
+                        lastSeen: Date.now()
+                    }, { merge: true });
+
+                    // Also update the profile in users collection
+                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'info'), {
+                        uid: user.uid,
+                        displayName: editData.displayName.trim(),
+                        bio: editData.bio.trim(),
+                        location: editData.location.trim(),
+                        photoURL: user.photoURL || '',
+                        email: user.email || '',
+                        lastSeen: Date.now()
+                    }, { merge: true });
+
+                    setProfileData({ ...profileData, ...editData });
+                    setIsEditing(false);
+                    if (onSaveProfile) onSaveProfile(editData);
+                } catch (err) {
+                    console.error('Error saving profile:', err);
+                }
+                setIsSaving(false);
+            };
+
+            if (!isOpen) return null;
+
+            const panelBg = theme === 'dark' ? 'bg-[#0f172a]/95' : 'bg-white/95';
+            const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+            const textMain = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-slate-400' : 'text-slate-500';
+            const inputBg = theme === 'dark' ? 'bg-slate-800/50 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400';
+            const cardBg = theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50';
+
+            return (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+                    <div className={`${panelBg} backdrop-blur-xl rounded-3xl max-w-lg w-full shadow-2xl border ${borderColor} animate-in zoom-in-95 max-h-[90vh] overflow-hidden flex flex-col`} onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className={`p-6 border-b ${borderColor} flex items-center justify-between`}>
+                            <h2 className={`text-xl font-bold ${textMain}`}>
+                                {isEditing ? 'Edit Profile' : 'My Profile'}
+                            </h2>
+                            <button onClick={onClose} className={`p-2 rounded-xl ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'} transition-colors`}>
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {isLoading ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Profile Header */}
+                                    <div className="flex items-center gap-4 mb-6">
+                                        {user?.photoURL ? (
+                                            <img src={user.photoURL} className="w-20 h-20 rounded-full border-4 border-indigo-500/20" alt="" />
+                                        ) : (
+                                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-2xl font-bold">
+                                                {editData.displayName?.charAt(0) || user?.displayName?.charAt(0) || '?'}
+                                            </div>
+                                        )}
+                                        <div className="flex-1">
+                                            {isEditing ? (
+                                                <input
+                                                    type="text"
+                                                    value={editData.displayName}
+                                                    onChange={e => setEditData({ ...editData, displayName: e.target.value })}
+                                                    placeholder="Display Name"
+                                                    className={`w-full px-4 py-2 rounded-xl border ${inputBg} outline-none focus:ring-2 focus:ring-indigo-500/50 text-lg font-bold`}
+                                                    maxLength={32}
+                                                />
+                                            ) : (
+                                                <h3 className={`text-2xl font-bold ${textMain}`}>{profileData?.displayName || user?.displayName || 'Anonymous'}</h3>
+                                            )}
+                                            <p className={`text-sm ${textSub}`}>{user?.email}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Bio and Location */}
+                                    {isEditing ? (
+                                        <div className="space-y-4 mb-6">
+                                            <div>
+                                                <label className={`text-sm font-bold ${textSub} block mb-2`}>Bio</label>
+                                                <textarea
+                                                    value={editData.bio}
+                                                    onChange={e => setEditData({ ...editData, bio: e.target.value })}
+                                                    placeholder="Tell us about yourself..."
+                                                    rows={3}
+                                                    className={`w-full px-4 py-3 rounded-xl border ${inputBg} outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none`}
+                                                    maxLength={200}
+                                                />
+                                                <p className={`text-xs ${textSub} mt-1`}>{editData.bio.length}/200</p>
+                                            </div>
+                                            <div>
+                                                <label className={`text-sm font-bold ${textSub} block mb-2`}>Location</label>
+                                                <input
+                                                    type="text"
+                                                    value={editData.location}
+                                                    onChange={e => setEditData({ ...editData, location: e.target.value })}
+                                                    placeholder="Where are you from?"
+                                                    className={`w-full px-4 py-3 rounded-xl border ${inputBg} outline-none focus:ring-2 focus:ring-indigo-500/50`}
+                                                    maxLength={50}
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="mb-6">
+                                            {(profileData?.bio || profileData?.location) && (
+                                                <div className={`${cardBg} rounded-2xl p-4`}>
+                                                    {profileData?.bio && <p className={`${textMain} mb-2`}>{profileData.bio}</p>}
+                                                    {profileData?.location && (
+                                                        <p className={`text-sm ${textSub} flex items-center gap-1`}>
+                                                            <span>📍</span> {profileData.location}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Statistics Section */}
+                                    <div className="mb-6">
+                                        <h4 className={`font-bold ${textMain} mb-4 flex items-center gap-2`}>
+                                            <Activity className="w-5 h-5 text-indigo-500" />
+                                            Learning Statistics
+                                        </h4>
+
+                                        {/* Overview Stats */}
+                                        <div className="grid grid-cols-3 gap-3 mb-4">
+                                            <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                <div className={`text-2xl font-black ${textMain}`}>{stats.total}</div>
+                                                <div className={`text-xs font-bold ${textSub} uppercase`}>Total</div>
+                                            </div>
+                                            <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                <div className="text-2xl font-black text-emerald-500">{stats.mastered}</div>
+                                                <div className={`text-xs font-bold ${textSub} uppercase`}>Mastered</div>
+                                            </div>
+                                            <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                <div className="text-2xl font-black text-amber-500">{stats.learning}</div>
+                                                <div className={`text-xs font-bold ${textSub} uppercase`}>Learning</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Category Breakdown */}
+                                        <div className="space-y-3">
+                                            <div className={`${cardBg} rounded-xl p-4 flex items-center justify-between`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center">
+                                                        <Book className="w-5 h-5 text-white" />
+                                                    </div>
+                                                    <div>
+                                                        <div className={`font-bold ${textMain}`}>Words</div>
+                                                        <div className={`text-xs ${textSub}`}>{stats.vocaMastered} mastered</div>
+                                                    </div>
+                                                </div>
+                                                <div className={`text-xl font-black ${textMain}`}>{stats.vocaCount}</div>
+                                            </div>
+
+                                            <div className={`${cardBg} rounded-xl p-4 flex items-center justify-between`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                                                        <MessageCircle className="w-5 h-5 text-white" />
+                                                    </div>
+                                                    <div>
+                                                        <div className={`font-bold ${textMain}`}>Phrases</div>
+                                                        <div className={`text-xs ${textSub}`}>{stats.phraseMastered} mastered</div>
+                                                    </div>
+                                                </div>
+                                                <div className={`text-xl font-black ${textMain}`}>{stats.phraseCount}</div>
+                                            </div>
+
+                                            <div className={`${cardBg} rounded-xl p-4 flex items-center justify-between`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center">
+                                                        <LinkIcon className="w-5 h-5 text-white" />
+                                                    </div>
+                                                    <div>
+                                                        <div className={`font-bold ${textMain}`}>Synonyms</div>
+                                                        <div className={`text-xs ${textSub}`}>{stats.synonymMastered} mastered</div>
+                                                    </div>
+                                                </div>
+                                                <div className={`text-xl font-black ${textMain}`}>{stats.synonymCount}</div>
+                                            </div>
+
+                                            <div className={`${cardBg} rounded-xl p-4 flex items-center justify-between`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center">
+                                                        <ArrowLeftRight className="w-5 h-5 text-white" />
+                                                    </div>
+                                                    <div>
+                                                        <div className={`font-bold ${textMain}`}>Antonyms</div>
+                                                        <div className={`text-xs ${textSub}`}>{stats.antonymMastered} mastered</div>
+                                                    </div>
+                                                </div>
+                                                <div className={`text-xl font-black ${textMain}`}>{stats.antonymCount}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className={`p-6 border-t ${borderColor}`}>
+                            {isEditing ? (
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setIsEditing(false)}
+                                        className={`flex-1 py-3 rounded-xl font-bold ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} transition-colors`}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={!editData.displayName.trim() || isSaving}
+                                        className="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-600 hover:to-violet-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                        Save Changes
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setIsEditing(true)}
+                                    className="w-full py-3 rounded-xl font-bold bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-600 hover:to-violet-600 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Pencil className="w-4 h-4" />
+                                    Edit Profile
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- USER PUBLIC PROFILE VIEW ---
+        // View another user's public profile with their vocabulary items
+        const UserPublicProfile = ({ isOpen, onClose, targetUser, theme, currentUser }) => {
+            const [profileData, setProfileData] = useState(null);
+            const [userItems, setUserItems] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
+            const [activeCategory, setActiveCategory] = useState('all');
+            const [error, setError] = useState(null);
+
+            // Load user profile and vocabulary
+            useEffect(() => {
+                if (!targetUser || !isOpen) return;
+                setIsLoading(true);
+                setError(null);
+
+                const loadUserData = async () => {
+                    try {
+                        // Load profile
+                        const profileDoc = await getDoc(doc(db, 'artifacts', appId, 'chatUsers', targetUser.uid || targetUser.id));
+                        if (profileDoc.exists()) {
+                            setProfileData(profileDoc.data());
+                        }
+
+                        // Load vocabulary items
+                        const vocabQuery = query(collection(db, 'artifacts', appId, 'users', targetUser.uid || targetUser.id, 'vocabulary'));
+                        const vocabSnapshot = await getDocs(vocabQuery);
+                        const items = vocabSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setUserItems(items);
+                    } catch (err) {
+                        console.error('Error loading user data:', err);
+                        setError('Could not load user profile');
+                    }
+                    setIsLoading(false);
+                };
+
+                loadUserData();
+            }, [targetUser, isOpen]);
+
+            // Calculate stats
+            const stats = useMemo(() => {
+                const total = userItems.length;
+                const mastered = userItems.filter(i => i.interval > 21).length;
+                const vocaCount = userItems.filter(i => i.type === 'voca').length;
+                const phraseCount = userItems.filter(i => i.type === 'phrase').length;
+                const synonymCount = userItems.filter(i => i.type === 'synonym').length;
+                const antonymCount = userItems.filter(i => i.type === 'antonym').length;
+                return { total, mastered, vocaCount, phraseCount, synonymCount, antonymCount };
+            }, [userItems]);
+
+            // Filter items by category
+            const filteredItems = useMemo(() => {
+                if (activeCategory === 'all') return userItems;
+                return userItems.filter(i => i.type === activeCategory);
+            }, [userItems, activeCategory]);
+
+            if (!isOpen) return null;
+
+            const panelBg = theme === 'dark' ? 'bg-[#0f172a]/95' : 'bg-white/95';
+            const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+            const textMain = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-slate-400' : 'text-slate-500';
+            const cardBg = theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50';
+
+            const categories = [
+                { id: 'all', label: 'All', icon: Layers, count: stats.total },
+                { id: 'voca', label: 'Words', icon: Book, count: stats.vocaCount, color: 'from-indigo-500 to-blue-500' },
+                { id: 'phrase', label: 'Phrases', icon: MessageCircle, count: stats.phraseCount, color: 'from-amber-400 to-orange-500' },
+                { id: 'synonym', label: 'Synonyms', icon: LinkIcon, count: stats.synonymCount, color: 'from-violet-500 to-purple-500' },
+                { id: 'antonym', label: 'Antonyms', icon: ArrowLeftRight, count: stats.antonymCount, color: 'from-rose-500 to-pink-500' }
+            ];
+
+            const getItemColor = (type) => {
+                switch(type) {
+                    case 'voca': return 'from-indigo-500 to-blue-500';
+                    case 'phrase': return 'from-amber-400 to-orange-500';
+                    case 'synonym': return 'from-violet-500 to-purple-500';
+                    case 'antonym': return 'from-rose-500 to-pink-500';
+                    default: return 'from-slate-500 to-slate-600';
+                }
+            };
+
+            const getItemIcon = (type) => {
+                switch(type) {
+                    case 'voca': return Book;
+                    case 'phrase': return MessageCircle;
+                    case 'synonym': return LinkIcon;
+                    case 'antonym': return ArrowLeftRight;
+                    default: return FileText;
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+                    <div className={`${panelBg} backdrop-blur-xl rounded-3xl max-w-2xl w-full shadow-2xl border ${borderColor} animate-in zoom-in-95 max-h-[90vh] overflow-hidden flex flex-col`} onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className={`p-6 border-b ${borderColor}`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    {targetUser?.photoURL ? (
+                                        <img src={targetUser.photoURL} className="w-14 h-14 rounded-full border-2 border-indigo-500/20" alt="" />
+                                    ) : (
+                                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-xl font-bold">
+                                            {targetUser?.displayName?.charAt(0) || '?'}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <h2 className={`text-xl font-bold ${textMain}`}>{profileData?.displayName || targetUser?.displayName || 'User'}</h2>
+                                        {profileData?.location && (
+                                            <p className={`text-sm ${textSub} flex items-center gap-1`}>
+                                                <span>📍</span> {profileData.location}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button onClick={onClose} className={`p-2 rounded-xl ${theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'} transition-colors`}>
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            {profileData?.bio && (
+                                <p className={`mt-4 ${textSub}`}>{profileData.bio}</p>
+                            )}
+                        </div>
+
+                        {/* Stats Bar */}
+                        <div className={`px-6 py-4 border-b ${borderColor} flex items-center gap-6`}>
+                            <div className="text-center">
+                                <div className={`text-xl font-black ${textMain}`}>{stats.total}</div>
+                                <div className={`text-xs ${textSub}`}>Total Items</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-xl font-black text-emerald-500">{stats.mastered}</div>
+                                <div className={`text-xs ${textSub}`}>Mastered</div>
+                            </div>
+                        </div>
+
+                        {/* Category Tabs */}
+                        <div className={`px-6 py-3 border-b ${borderColor} flex gap-2 overflow-x-auto no-scrollbar`}>
+                            {categories.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setActiveCategory(cat.id)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
+                                        activeCategory === cat.id
+                                            ? cat.color ? `bg-gradient-to-r ${cat.color} text-white` : 'bg-indigo-500 text-white'
+                                            : theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    <cat.icon className="w-4 h-4" />
+                                    {cat.label} ({cat.count})
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {isLoading ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                                </div>
+                            ) : error ? (
+                                <div className={`text-center py-12 ${textSub}`}>
+                                    <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                                    <p>{error}</p>
+                                </div>
+                            ) : filteredItems.length === 0 ? (
+                                <div className={`text-center py-12 ${textSub}`}>
+                                    <Layers className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                                    <p>No {activeCategory === 'all' ? 'items' : activeCategory + 's'} yet</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {filteredItems.map((item, index) => {
+                                        const ItemIcon = getItemIcon(item.type);
+                                        const colorClass = getItemColor(item.type);
+                                        const masteryLevel = getMasteryStars(item.interval || 0);
+
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className={`${cardBg} rounded-2xl p-4 flex items-center gap-4 animate-in slide-in-from-bottom-2`}
+                                                style={{ animationDelay: `${index * 30}ms` }}
+                                            >
+                                                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colorClass} flex items-center justify-center shrink-0`}>
+                                                    <ItemIcon className="w-6 h-6 text-white" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className={`font-bold ${textMain} truncate`}>{item.mainText}</div>
+                                                    {item.context && <div className={`text-sm ${textSub} truncate`}>{item.context}</div>}
+                                                    {item.related && item.related.length > 0 && (
+                                                        <div className={`text-sm ${item.type === 'antonym' ? 'text-rose-500' : 'text-violet-500'} truncate`}>
+                                                            {item.type === 'antonym' ? '↔ ' : '→ '}{item.related.join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-0.5">
+                                                    {[...Array(5)].map((_, i) => (
+                                                        <Star
+                                                            key={i}
+                                                            className={`w-3 h-3 ${i < masteryLevel ? 'text-amber-400 fill-amber-400' : theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -6300,6 +6869,17 @@ Respond with ONLY the JSON object, nothing else.`
             const [shareRequests, setShareRequests] = useState([]);
             const [friends, setFriends] = useState([]);
 
+            // User profile modal state
+            const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+            const [isPublicProfileOpen, setIsPublicProfileOpen] = useState(false);
+            const [viewingUser, setViewingUser] = useState(null);
+
+            // Function to view another user's profile
+            const openPublicProfile = (targetUser) => {
+                setViewingUser(targetUser);
+                setIsPublicProfileOpen(true);
+            };
+
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
                     setUser(u);
@@ -6541,13 +7121,13 @@ Respond with ONLY the JSON object, nothing else.`
                 <div className={`min-h-screen pb-20 selection:bg-indigo-500 selection:text-white relative transition-colors duration-500 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>
                     <div className={`fixed inset-0 z-[-1] ${bgGradient} transition-colors duration-700`}></div>
                     
-                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} setIsMessengerOpen={setIsMessengerOpen} totalUnreadMessages={totalUnreadMessages} setIsShareModalOpen={setIsShareModalOpen} setIsSharingInboxOpen={setIsSharingInboxOpen} shareRequestCount={shareRequests.length} />
+                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} setIsMessengerOpen={setIsMessengerOpen} totalUnreadMessages={totalUnreadMessages} setIsShareModalOpen={setIsShareModalOpen} setIsSharingInboxOpen={setIsSharingInboxOpen} shareRequestCount={shareRequests.length} setIsProfileModalOpen={setIsProfileModalOpen} />
                     
                     <main>
                         {activeTab === 'landing' && ( <LandingPage setActiveTab={setActiveTab} theme={theme} /> )}
                         {activeTab === 'dashboard' && ( <Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} /> )}
                         {activeTab === 'mylearning' && ( <MyLearning items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} user={user} onShareToPeers={handleShareToPeers} /> )}
-                        {activeTab === 'peers' && ( <Peers user={user} theme={theme} /> )}
+                        {activeTab === 'peers' && ( <Peers user={user} theme={theme} onViewProfile={openPublicProfile} /> )}
                         {activeTab === 'admin' && ( <AdminPanel user={user} theme={theme} /> )}
                     </main>
                     {reviewQueue && ( <ReviewSession dueItems={reviewQueue} mode={reviewMode} onClose={() => setReviewQueue(null)} onComplete={handleUpdateSRS} theme={theme} /> )}
@@ -6567,7 +7147,7 @@ Respond with ONLY the JSON object, nothing else.`
                     <ToastContainer toasts={toasts} removeToast={removeToast} theme={theme} />
                     
                     {/* Messenger */}
-                    <Messenger isOpen={isMessengerOpen} onClose={() => setIsMessengerOpen(false)} user={user} theme={theme} onUnreadChange={setTotalUnreadMessages} />
+                    <Messenger isOpen={isMessengerOpen} onClose={() => setIsMessengerOpen(false)} user={user} theme={theme} onUnreadChange={setTotalUnreadMessages} onViewProfile={openPublicProfile} />
                     
                     {/* Sharing System */}
                     <ShareVocabularyModal 
@@ -6578,14 +7158,33 @@ Respond with ONLY the JSON object, nothing else.`
                         friends={friends} 
                         theme={theme} 
                     />
-                    <SharingInbox 
-                        isOpen={isSharingInboxOpen} 
-                        onClose={() => setIsSharingInboxOpen(false)} 
-                        user={user} 
-                        theme={theme} 
+                    <SharingInbox
+                        isOpen={isSharingInboxOpen}
+                        onClose={() => setIsSharingInboxOpen(false)}
+                        user={user}
+                        theme={theme}
                         shareRequests={shareRequests}
                         onAcceptShare={handleAcceptShare}
                         onDeclineShare={handleDeclineShare}
+                    />
+
+                    {/* User Profile Modal - View and edit own profile */}
+                    <UserProfileModal
+                        isOpen={isProfileModalOpen}
+                        onClose={() => setIsProfileModalOpen(false)}
+                        user={user}
+                        theme={theme}
+                        items={items}
+                        onSaveProfile={(data) => showToast('Profile updated successfully!', 'success')}
+                    />
+
+                    {/* Public Profile View - View other users' profiles */}
+                    <UserPublicProfile
+                        isOpen={isPublicProfileOpen}
+                        onClose={() => { setIsPublicProfileOpen(false); setViewingUser(null); }}
+                        targetUser={viewingUser}
+                        theme={theme}
+                        currentUser={user}
                     />
                 </div>
             );
