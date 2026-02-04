@@ -183,6 +183,26 @@
             animation: likeHeart 0.4s ease-out;
         }
 
+        /* Lightbox Styles */
+        .lightbox-overlay {
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(8px);
+        }
+        .lightbox-image {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        @keyframes lightboxZoomIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-lightbox-in {
+            animation: lightboxZoomIn 0.3s ease-out forwards;
+        }
+
         @keyframes postSlideIn {
             from { opacity: 0; transform: translateY(20px) scale(0.98); }
             to { opacity: 1; transform: translateY(0) scale(1); }
@@ -1840,11 +1860,15 @@ Respond with ONLY the JSON object, nothing else.`
             // Share confirmation state
             const [shareConfirm, setShareConfirm] = useState(null);
             
+            // Delete confirmation state for single word
+            const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
+            
             const categories = [
-                { id: 'voca', label: 'Vocabulary', icon: Book, color: 'from-indigo-500 to-blue-500', count: items.filter(i => i.type === 'voca').length },
-                { id: 'synonym', label: 'Synonyms', icon: LinkIcon, color: 'from-violet-500 to-purple-500', count: items.filter(i => i.type === 'synonym').length },
-                { id: 'antonym', label: 'Antonyms', icon: ArrowLeftRight, color: 'from-rose-500 to-pink-500', count: items.filter(i => i.type === 'antonym').length },
-                { id: 'phrase', label: 'Phrases', icon: MessageCircle, color: 'from-amber-400 to-orange-500', count: items.filter(i => i.type === 'phrase').length },
+                { id: 'voca', label: 'Vocabulary', icon: Book, color: 'from-indigo-500 to-blue-500', count: items.filter(i => i.type === 'voca' && !i.sharedBy).length },
+                { id: 'synonym', label: 'Synonyms', icon: LinkIcon, color: 'from-violet-500 to-purple-500', count: items.filter(i => i.type === 'synonym' && !i.sharedBy).length },
+                { id: 'antonym', label: 'Antonyms', icon: ArrowLeftRight, color: 'from-rose-500 to-pink-500', count: items.filter(i => i.type === 'antonym' && !i.sharedBy).length },
+                { id: 'phrase', label: 'Phrases', icon: MessageCircle, color: 'from-amber-400 to-orange-500', count: items.filter(i => i.type === 'phrase' && !i.sharedBy).length },
+                { id: 'shared', label: 'Shared Words', icon: Share2, color: 'from-emerald-500 to-teal-500', count: items.filter(i => i.sharedBy).length },
             ];
 
             const cardBg = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
@@ -1940,7 +1964,22 @@ Respond with ONLY the JSON object, nothing else.`
                 setShareMessage('');
             };
 
-            const filteredItems = items.filter(i => i.type === activeCategory);
+            // Single item delete confirmation handlers
+            const handleDeleteClick = (item) => {
+                setDeleteConfirmItem(item);
+            };
+
+            const confirmDeleteItem = () => {
+                if (deleteConfirmItem) {
+                    onDelete(deleteConfirmItem.id);
+                    setDeleteConfirmItem(null);
+                }
+            };
+
+            // Filter items based on active category - Shared category shows all items with sharedBy property
+            const filteredItems = activeCategory === 'shared' 
+                ? items.filter(i => i.sharedBy)
+                : items.filter(i => i.type === activeCategory && !i.sharedBy);
             const currentCategory = categories.find(c => c.id === activeCategory);
 
             return (
@@ -1984,7 +2023,8 @@ Respond with ONLY the JSON object, nothing else.`
                         </div>
                     </div>
 
-                    {/* Add New Entry Section - Dropdown Forms */}
+                    {/* Add New Entry Section - Dropdown Forms (Hidden for Shared Words) */}
+                    {activeCategory !== 'shared' && (
                     <div className={`${cardBg} rounded-[2.5rem] shadow-xl overflow-hidden`}>
                         {/* Dropdown Toggle Button */}
                         <button
@@ -2118,6 +2158,7 @@ Respond with ONLY the JSON object, nothing else.`
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Items Grid */}
                     <div className={`${cardBg} rounded-[2.5rem] p-8 shadow-xl`}>
@@ -2126,7 +2167,7 @@ Respond with ONLY the JSON object, nothing else.`
                                 <currentCategory.icon className="w-5 h-5" />
                                 {currentCategory.label} <span className={`text-sm font-normal ${textSub}`}>({filteredItems.length})</span>
                             </h3>
-                            {filteredItems.length > 0 && (
+                            {filteredItems.length > 0 && activeCategory !== 'shared' && (
                                 <button 
                                     onClick={() => onDeleteAll(activeCategory)}
                                     className={`p-2 rounded-xl transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
@@ -2141,35 +2182,39 @@ Respond with ONLY the JSON object, nothing else.`
                             <div className={`text-center py-16 rounded-3xl border border-dashed ${theme === 'dark' ? 'border-slate-700 text-slate-500' : 'border-slate-200 text-slate-400'}`}>
                                 <currentCategory.icon className={`w-12 h-12 mx-auto mb-4 opacity-30`} />
                                 <p className="font-medium">No {currentCategory.label.toLowerCase()} yet</p>
-                                <p className="text-sm mt-1">Use the form above to add your first entry</p>
+                                <p className="text-sm mt-1">{activeCategory === 'shared' ? 'Words shared by others will appear here' : 'Use the form above to add your first entry'}</p>
                             </div>
                         ) : (
-                            <div className={`grid gap-4 ${activeCategory === 'phrase' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
-                                {filteredItems.map(item => (
-                                    <ItemCard 
-                                        key={item.id} 
-                                        type={item.type}
-                                        title={item.mainText} 
-                                        theme={theme} 
-                                        subtitle={
-                                            item.type === 'voca' ? (
-                                                <span><span className="font-bold text-indigo-500 uppercase text-[10px] tracking-wider mr-2 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.pos}</span>{item.context || "No definition"}</span>
-                                            ) : item.type === 'synonym' ? (
-                                                <span className="text-violet-500">{item.related?.join(', ') || '...'}</span>
-                                            ) : item.type === 'antonym' ? (
-                                                <span className="text-rose-500">↔ {item.related?.[0] || '?'}</span>
-                                            ) : (
-                                                <span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>
-                                            )
-                                        }
-                                        icon={currentCategory.icon}
-                                        onEdit={() => openEditModal(item)}
-                                        onShare={() => handleShareToPeers(item)}
-                                        onDelete={() => onDelete(item.id)}
-                                        interval={item.interval}
-                                        sharedBy={item.sharedBy}
-                                    />
-                                ))}
+                            <div className={`grid gap-4 ${activeCategory === 'phrase' || activeCategory === 'shared' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                                {filteredItems.map(item => {
+                                    // Determine the correct icon based on item type
+                                    const itemIcon = item.type === 'voca' ? Book : item.type === 'synonym' ? LinkIcon : item.type === 'antonym' ? ArrowLeftRight : MessageCircle;
+                                    return (
+                                        <ItemCard 
+                                            key={item.id} 
+                                            type={item.type}
+                                            title={item.mainText} 
+                                            theme={theme} 
+                                            subtitle={
+                                                item.type === 'voca' ? (
+                                                    <span><span className="font-bold text-indigo-500 uppercase text-[10px] tracking-wider mr-2 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.pos}</span>{item.context || "No definition"}</span>
+                                                ) : item.type === 'synonym' ? (
+                                                    <span className="text-violet-500">{item.related?.join(', ') || '...'}</span>
+                                                ) : item.type === 'antonym' ? (
+                                                    <span className="text-rose-500">↔ {item.related?.[0] || '?'}</span>
+                                                ) : (
+                                                    <span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>
+                                                )
+                                            }
+                                            icon={activeCategory === 'shared' ? itemIcon : currentCategory.icon}
+                                            onEdit={() => openEditModal(item)}
+                                            onShare={activeCategory !== 'shared' ? () => handleShareToPeers(item) : undefined}
+                                            onDelete={() => handleDeleteClick(item)}
+                                            interval={item.interval}
+                                            sharedBy={item.sharedBy}
+                                        />
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -2342,6 +2387,43 @@ Respond with ONLY the JSON object, nothing else.`
                             </div>
                         </div>
                     )}
+
+                    {/* Delete Confirmation Modal for Single Item */}
+                    {deleteConfirmItem && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setDeleteConfirmItem(null)}>
+                            <div className={`${theme === 'dark' ? 'bg-slate-800/95 border-slate-700' : 'bg-white/95 border-slate-200'} p-8 rounded-3xl max-w-md w-full shadow-2xl border backdrop-blur-xl animate-in zoom-in-95 duration-300`} onClick={e => e.stopPropagation()}>
+                                <div className="text-center">
+                                    <div className={`w-16 h-16 mx-auto mb-5 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-red-500/20' : 'bg-red-100'}`}>
+                                        <Trash2 className={`w-8 h-8 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`} />
+                                    </div>
+                                    <h3 className={`text-2xl font-black mb-3 ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>Delete Word?</h3>
+                                    <p className={`mb-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                        Are you sure you want to delete this word?
+                                    </p>
+                                    <div className={`p-3 rounded-xl mb-6 ${theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
+                                        <p className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>"{deleteConfirmItem.mainText}"</p>
+                                        {deleteConfirmItem.context && <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{deleteConfirmItem.context}</p>}
+                                    </div>
+                                    <p className={`text-sm mb-6 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>This action cannot be undone.</p>
+                                    <div className="flex gap-3 justify-center">
+                                        <button 
+                                            onClick={() => setDeleteConfirmItem(null)} 
+                                            className={`px-6 py-3 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            onClick={confirmDeleteItem} 
+                                            className="px-6 py-3 rounded-2xl font-bold bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/25 flex items-center gap-2"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -2356,6 +2438,14 @@ Respond with ONLY the JSON object, nothing else.`
             const [isPosting, setIsPosting] = useState(false);
             const [isLoading, setIsLoading] = useState(true);
             const [selectedPostId, setSelectedPostId] = useState(null);
+            
+            // State for showing inline comments directly under posts
+            const [expandedComments, setExpandedComments] = useState({});
+            const [inlineComments, setInlineComments] = useState({});
+            const [loadingComments, setLoadingComments] = useState({});
+            
+            // Lightbox state for fullscreen image viewing
+            const [lightboxImage, setLightboxImage] = useState(null);
             
             // Edit post state
             const [editingPost, setEditingPost] = useState(null);
@@ -2507,6 +2597,74 @@ Respond with ONLY the JSON object, nothing else.`
             };
 
             const getPostTypeInfo = (type) => postTypes.find(t => t.id === type) || postTypes[0];
+
+            // Toggle and load inline comments for a post
+            const toggleInlineComments = async (postId) => {
+                if (expandedComments[postId]) {
+                    // Collapse comments
+                    setExpandedComments(prev => ({ ...prev, [postId]: false }));
+                    return;
+                }
+                
+                // Expand and load comments if not already loaded
+                setExpandedComments(prev => ({ ...prev, [postId]: true }));
+                
+                if (!inlineComments[postId]) {
+                    setLoadingComments(prev => ({ ...prev, [postId]: true }));
+                    try {
+                        const q = query(
+                            collection(db, 'artifacts', appId, 'peerPosts', postId, 'comments'),
+                            orderBy('createdAt', 'asc')
+                        );
+                        const snapshot = await getDocs(q);
+                        const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setInlineComments(prev => ({ ...prev, [postId]: comments }));
+                    } catch (err) {
+                        console.error('Error loading comments:', err);
+                    }
+                    setLoadingComments(prev => ({ ...prev, [postId]: false }));
+                }
+            };
+
+            // Real-time listener for inline comments
+            useEffect(() => {
+                const unsubscribers = [];
+                Object.keys(expandedComments).forEach(postId => {
+                    if (expandedComments[postId]) {
+                        const q = query(
+                            collection(db, 'artifacts', appId, 'peerPosts', postId, 'comments'),
+                            orderBy('createdAt', 'asc')
+                        );
+                        const unsub = onSnapshot(q, (snapshot) => {
+                            const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            setInlineComments(prev => ({ ...prev, [postId]: comments }));
+                        });
+                        unsubscribers.push(unsub);
+                    }
+                });
+                return () => unsubscribers.forEach(unsub => unsub());
+            }, [expandedComments]);
+
+            // Lightbox component for fullscreen images
+            const ImageLightbox = ({ imageUrl, onClose }) => (
+                <div 
+                    className="fixed inset-0 z-[300] lightbox-overlay flex items-center justify-center p-4 cursor-zoom-out"
+                    onClick={onClose}
+                >
+                    <button 
+                        className="absolute top-4 right-4 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
+                        onClick={onClose}
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                    <img 
+                        src={imageUrl} 
+                        alt="Full size" 
+                        className="lightbox-image animate-lightbox-in"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            );
 
             // Post Detail Modal - with local state for comments to prevent parent re-renders
             const PostDetailModal = () => {
@@ -3002,15 +3160,63 @@ Respond with ONLY the JSON object, nothing else.`
                                                         <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${hasLiked ? 'fill-rose-500 animate-like-heart' : ''}`} />
                                                         {post.likeCount || 0}
                                                     </button>
-                                                    <button className={`flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium ${textSub} hover:text-indigo-500 transition-all`}>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); toggleInlineComments(post.id); }}
+                                                        className={`flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium transition-all ${
+                                                            expandedComments[post.id] ? 'text-indigo-500' : textSub + ' hover:text-indigo-500'
+                                                        }`}
+                                                    >
                                                         <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                         {post.commentCount || 0}
+                                                        <ChevronDown className={`w-3 h-3 transition-transform ${expandedComments[post.id] ? 'rotate-180' : ''}`} />
                                                     </button>
                                                     <span className={`flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium ${textSub}`} title="Views">
                                                         <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                         {post.viewCount || 0}
                                                     </span>
                                                 </div>
+                                                
+                                                {/* Inline Comments Section - Displayed directly under post */}
+                                                {expandedComments[post.id] && (
+                                                    <div className={`mt-3 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`} onClick={(e) => e.stopPropagation()}>
+                                                        {loadingComments[post.id] ? (
+                                                            <div className="flex justify-center py-4">
+                                                                <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                                                            </div>
+                                                        ) : (inlineComments[post.id]?.length || 0) === 0 ? (
+                                                            <p className={`text-xs ${textSub} text-center py-3`}>No comments yet. Click on the post to add one!</p>
+                                                        ) : (
+                                                            <div className="space-y-2">
+                                                                {inlineComments[post.id]?.slice(0, 3).map(comment => (
+                                                                    <div key={comment.id} className={`flex gap-2 p-2 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50/80'}`}>
+                                                                        {comment.authorPhoto ? (
+                                                                            <img src={comment.authorPhoto} className="w-6 h-6 rounded-full flex-shrink-0" alt="" />
+                                                                        ) : (
+                                                                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-400 to-violet-400 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                                                                                {comment.authorName?.charAt(0) || '?'}
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className={`font-semibold text-xs ${textColor}`}>{comment.authorName}</span>
+                                                                                <span className={`text-[10px] ${textSub}`}>{formatTime(comment.createdAt)}</span>
+                                                                            </div>
+                                                                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'} mt-0.5 break-words`}>{comment.content}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                                {(inlineComments[post.id]?.length || 0) > 3 && (
+                                                                    <button 
+                                                                        onClick={() => setSelectedPostId(post.id)}
+                                                                        className={`w-full text-center text-xs font-medium py-2 rounded-lg transition-colors ${theme === 'dark' ? 'text-indigo-400 hover:bg-slate-800' : 'text-indigo-600 hover:bg-slate-100'}`}
+                                                                    >
+                                                                        View all {inlineComments[post.id]?.length} comments →
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -3091,6 +3297,9 @@ Respond with ONLY the JSON object, nothing else.`
                             </div>
                         </div>
                     )}
+
+                    {/* Lightbox for fullscreen image viewing */}
+                    {lightboxImage && <ImageLightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />}
 
                     {/* Delete Confirmation Modal */}
                     {deleteConfirm && (
@@ -3368,6 +3577,9 @@ Respond with ONLY the JSON object, nothing else.`
             const [showRemoveFriendModal, setShowRemoveFriendModal] = useState(false);
             const [friendToRemove, setFriendToRemove] = useState(null);
             const [isRemovingFriend, setIsRemovingFriend] = useState(false);
+            
+            // Lightbox state for viewing images fullscreen
+            const [lightboxImageUrl, setLightboxImageUrl] = useState(null);
 
             // Scroll to bottom of messages
             const scrollToBottom = () => {
@@ -4746,15 +4958,18 @@ Respond with ONLY the JSON object, nothing else.`
                                                                                     ? 'bg-slate-800 text-white rounded-bl-md' 
                                                                                     : 'bg-slate-100 text-slate-800 rounded-bl-md'
                                                                         }`}>
-                                                                            {/* Image message */}
+                                                                            {/* Image message - clickable for lightbox */}
                                                                             {msg.imageUrl && (
                                                                                 <div className="mb-2">
                                                                                     <img 
                                                                                         src={msg.imageUrl} 
                                                                                         alt="Shared image" 
-                                                                                        className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                                                                        className="max-w-full rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity"
                                                                                         style={{ maxHeight: '200px' }}
-                                                                                        onClick={() => window.open(msg.imageUrl, '_blank')}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setLightboxImageUrl(msg.imageUrl);
+                                                                                        }}
                                                                                     />
                                                                                 </div>
                                                                             )}
@@ -4857,20 +5072,28 @@ Respond with ONLY the JSON object, nothing else.`
                                             </div>
                                         )}
                                         <div className="flex gap-2">
-                                            {/* Hidden image input */}
+                                            {/* Hidden image input with mobile camera/gallery support */}
                                             <input
                                                 type="file"
                                                 accept="image/*"
+                                                capture="environment"
                                                 ref={imageInputRef}
                                                 onChange={handleImageSelect}
                                                 className="hidden"
                                             />
-                                            {/* Image upload button */}
+                                            {/* Image upload button - opens native picker on mobile */}
                                             <button
                                                 type="button"
-                                                onClick={() => imageInputRef.current?.click()}
+                                                onClick={() => {
+                                                    // On mobile, we need to trigger the file input which will show camera/gallery options
+                                                    if (imageInputRef.current) {
+                                                        // Remove capture attribute temporarily to show both options on some devices
+                                                        imageInputRef.current.removeAttribute('capture');
+                                                        imageInputRef.current.click();
+                                                    }
+                                                }}
                                                 className={`p-3 rounded-xl transition-all ${theme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-indigo-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-indigo-500'}`}
-                                                title="Send image"
+                                                title="Send image (camera or gallery)"
                                             >
                                                 <ImageIcon className="w-5 h-5" />
                                             </button>
@@ -4901,6 +5124,27 @@ Respond with ONLY the JSON object, nothing else.`
                                 </div>
                             )}
                         </div>
+
+                        {/* Lightbox for fullscreen image viewing */}
+                        {lightboxImageUrl && (
+                            <div 
+                                className="absolute inset-0 z-[70] lightbox-overlay flex items-center justify-center p-4 cursor-zoom-out rounded-3xl"
+                                onClick={() => setLightboxImageUrl(null)}
+                            >
+                                <button 
+                                    className="absolute top-4 right-4 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
+                                    onClick={() => setLightboxImageUrl(null)}
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                                <img 
+                                    src={lightboxImageUrl} 
+                                    alt="Full size" 
+                                    className="lightbox-image animate-lightbox-in"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </div>
+                        )}
 
                         {/* Remove Friend Modal - At messenger level so it works from Friends tab */}
                         {showRemoveFriendModal && friendToRemove && (
