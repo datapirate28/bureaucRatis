@@ -1192,7 +1192,7 @@
                     // Player Finished!
                     setView('waiting');
 
-                    // Mark as finished in DB
+                    // Mark as finished in DB & Check for Game Over
                     const gameRef = doc(db, 'artifacts', appId, 'games', gameId);
                     const freshSnap = await getDoc(gameRef);
                     if (freshSnap.exists()) {
@@ -1200,7 +1200,15 @@
                         const updatedPlayers = freshData.players.map(p =>
                             p.uid === user.uid ? { ...p, finished: true } : p
                         );
-                        await updateDoc(gameRef, { players: updatedPlayers });
+
+                        // Check if ALL players are finished
+                        const allFinished = updatedPlayers.every(p => p.finished);
+
+                        if (allFinished) {
+                            await updateDoc(gameRef, { players: updatedPlayers, status: 'finished' });
+                        } else {
+                            await updateDoc(gameRef, { players: updatedPlayers });
+                        }
                     }
                 } else {
                     // Next Question Local
