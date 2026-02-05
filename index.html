@@ -9108,13 +9108,22 @@ Respond with ONLY the JSON object, nothing else.`
                 }
             };
 
-            // Detect mobile browsers for auth redirect
+            // Detect mobile browsers and platforms
             const isMobileBrowser = () => {
                 return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                     (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
             };
 
-            // Handle redirect result on page load (for mobile auth)
+            const isIOS = () => {
+                return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            };
+
+            const isAndroid = () => {
+                return /Android/i.test(navigator.userAgent);
+            };
+
+            // Handle redirect result on page load (for Android auth)
             useEffect(() => {
                 getRedirectResult(auth).then(async (result) => {
                     if (result?.user) {
@@ -9150,24 +9159,41 @@ Respond with ONLY the JSON object, nothing else.`
                     return;
                 }
                 const provider = new GoogleAuthProvider();
+                // Force account selection for better UX
+                provider.setCustomParameters({ prompt: 'select_account' });
+
                 try {
-                    // Use redirect for mobile (more reliable, avoids popup/cookie issues)
-                    if (isMobileBrowser()) {
+                    // iOS Safari: Use popup (redirect fails due to ITP)
+                    // Android: Use redirect (popup often blocked)
+                    // Desktop: Use popup
+                    if (isAndroid()) {
                         await signInWithRedirect(auth, provider);
                     } else {
+                        // iOS and Desktop use popup
                         await signInWithPopup(auth, provider);
                     }
                 } catch (err) {
                     console.error('Login error:', err);
-                    // If popup fails, try redirect as fallback
-                    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+                    // Handle specific error cases
+                    if (err.code === 'auth/popup-blocked') {
+                        // Try redirect as fallback if popup is blocked
                         try {
                             await signInWithRedirect(auth, provider);
                         } catch (redirectErr) {
-                            setAuthError(redirectErr.message);
+                            setAuthError('Login failed. Please enable popups or try a different browser.');
                         }
+                    } else if (err.code === 'auth/popup-closed-by-user') {
+                        // User closed the popup, don't show error
+                        console.log('User closed login popup');
+                    } else if (err.code === 'auth/cancelled-popup-request') {
+                        // Multiple popup requests, ignore
+                        console.log('Popup request cancelled');
+                    } else if (err.code === 'auth/network-request-failed') {
+                        setAuthError('Network error. Please check your internet connection.');
+                    } else if (err.code === 'auth/unauthorized-domain') {
+                        setAuthError('This domain is not authorized. Please contact support.');
                     } else {
-                        setAuthError(err.message);
+                        setAuthError(err.message || 'Login failed. Please try again.');
                     }
                 }
             };
