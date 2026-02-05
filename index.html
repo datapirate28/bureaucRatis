@@ -1408,13 +1408,12 @@
                                 </div>
 
                                 {timeLeft !== null && (
-                                    <div className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-mono font-black text-base sm:text-xl backdrop-blur-md transition-all shadow-lg ${
-                                        timeLeft < 10
-                                            ? 'bg-red-500/20 text-red-500 animate-pulse border border-red-500/50'
-                                            : theme === 'dark'
-                                                ? 'bg-black/20 text-white/90 border border-white/10'
-                                                : 'bg-white/70 text-slate-800 border border-white/50'
-                                    }`}>
+                                    <div className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-mono font-black text-base sm:text-xl backdrop-blur-md transition-all shadow-lg ${timeLeft < 10
+                                        ? 'bg-red-500/20 text-red-500 animate-pulse border border-red-500/50'
+                                        : theme === 'dark'
+                                            ? 'bg-black/20 text-white/90 border border-white/10'
+                                            : 'bg-white/70 text-slate-800 border border-white/50'
+                                        }`}>
                                         {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                                     </div>
                                 )}
@@ -1432,17 +1431,16 @@
                             <div className="flex justify-between items-center mt-2.5 mb-4 sm:mb-6 px-1 sm:px-2">
                                 <div className="flex items-center gap-1">
                                     {questions.map((_, i) => (
-                                        <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${
-                                            i === currentQIndex
-                                                ? theme === 'dark'
-                                                    ? 'w-6 sm:w-8 bg-white shadow-[0_0_10px_white]'
-                                                    : 'w-6 sm:w-8 bg-indigo-600 shadow-[0_0_10px_rgba(99,102,241,0.5)]'
-                                                : i < currentQIndex
-                                                    ? 'w-1.5 sm:w-2 bg-indigo-500'
-                                                    : theme === 'dark'
-                                                        ? 'w-1.5 sm:w-2 bg-white/10'
-                                                        : 'w-1.5 sm:w-2 bg-slate-300'
-                                        }`}></div>
+                                        <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === currentQIndex
+                                            ? theme === 'dark'
+                                                ? 'w-6 sm:w-8 bg-white shadow-[0_0_10px_white]'
+                                                : 'w-6 sm:w-8 bg-indigo-600 shadow-[0_0_10px_rgba(99,102,241,0.5)]'
+                                            : i < currentQIndex
+                                                ? 'w-1.5 sm:w-2 bg-indigo-500'
+                                                : theme === 'dark'
+                                                    ? 'w-1.5 sm:w-2 bg-white/10'
+                                                    : 'w-1.5 sm:w-2 bg-slate-300'
+                                            }`}></div>
                                     ))}
                                 </div>
                                 <div className={`flex flex-col items-end backdrop-blur-sm rounded-xl px-3 py-1.5 ${theme === 'dark' ? 'bg-white/5 border border-white/10' : 'bg-white/60 border border-white/40 shadow-sm'}`}>
@@ -1504,11 +1502,10 @@
                                 <div className="fixed bottom-4 sm:bottom-8 left-0 right-0 px-4 sm:px-6 flex justify-center z-50 animate-in slide-in-from-bottom-20 duration-500">
                                     <button
                                         onClick={nextQuestion}
-                                        className={`py-3 sm:py-4 px-8 sm:px-12 rounded-full font-black text-base sm:text-lg tracking-widest uppercase hover:scale-105 active:scale-95 transition-all flex items-center gap-2 sm:gap-3 ${
-                                            theme === 'dark'
-                                                ? 'bg-white text-slate-950 shadow-[0_10px_40px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_60px_rgba(255,255,255,0.3)] ring-4 ring-white/10'
-                                                : 'bg-indigo-600 text-white shadow-[0_10px_40px_rgba(99,102,241,0.4)] hover:shadow-[0_20px_60px_rgba(99,102,241,0.5)] ring-4 ring-indigo-200'
-                                        }`}
+                                        className={`py-3 sm:py-4 px-8 sm:px-12 rounded-full font-black text-base sm:text-lg tracking-widest uppercase hover:scale-105 active:scale-95 transition-all flex items-center gap-2 sm:gap-3 ${theme === 'dark'
+                                            ? 'bg-white text-slate-950 shadow-[0_10px_40px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_60px_rgba(255,255,255,0.3)] ring-4 ring-white/10'
+                                            : 'bg-indigo-600 text-white shadow-[0_10px_40px_rgba(99,102,241,0.4)] hover:shadow-[0_20px_60px_rgba(99,102,241,0.5)] ring-4 ring-indigo-200'
+                                            }`}
                                     >
                                         Next <ChevronRight className="w-5 h-5" />
                                     </button>
@@ -1549,15 +1546,14 @@
 
                             <div className="flex-1 w-full max-w-2xl mx-auto space-y-3 overflow-y-auto pb-32 custom-scrollbar">
                                 {players.sort((a, b) => b.score - a.score).map((p, i) => (
-                                    <div key={p.uid} className={`relative group p-4 sm:p-6 rounded-3xl border transition-all duration-500 ${
-                                        p.uid === user.uid
-                                            ? theme === 'dark'
-                                                ? 'bg-white/10 border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.15)] z-10 scale-[1.02]'
-                                                : 'bg-indigo-50 border-indigo-300 shadow-[0_0_30px_rgba(99,102,241,0.2)] z-10 scale-[1.02]'
-                                            : theme === 'dark'
-                                                ? 'bg-black/20 border-white/5 hover:bg-white/5'
-                                                : 'bg-white/60 border-white/50 hover:bg-white/80'
-                                    }`}>
+                                    <div key={p.uid} className={`relative group p-4 sm:p-6 rounded-3xl border transition-all duration-500 ${p.uid === user.uid
+                                        ? theme === 'dark'
+                                            ? 'bg-white/10 border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.15)] z-10 scale-[1.02]'
+                                            : 'bg-indigo-50 border-indigo-300 shadow-[0_0_30px_rgba(99,102,241,0.2)] z-10 scale-[1.02]'
+                                        : theme === 'dark'
+                                            ? 'bg-black/20 border-white/5 hover:bg-white/5'
+                                            : 'bg-white/60 border-white/50 hover:bg-white/80'
+                                        }`}>
                                         <div className="flex items-center gap-6 relative z-10">
                                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg ${i === 0 ? 'bg-yellow-400 text-yellow-950' : i === 1 ? 'bg-zinc-300 text-zinc-900' : i === 2 ? 'bg-amber-700 text-amber-100' : theme === 'dark' ? 'bg-white/5 text-white/30' : 'bg-slate-200 text-slate-500'}`}>
                                                 {i + 1}
@@ -6356,12 +6352,11 @@ Respond with ONLY the JSON object, nothing else.`
                                                 Badges
                                             </h4>
                                             <div className={`${cardBg} rounded-xl p-4 flex items-center gap-4`}>
-                                                <div className={`w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br ${
-                                                    userStats.badges.rescuer.tier === 'platinum' ? 'from-purple-400 to-indigo-500' :
+                                                <div className={`w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br ${userStats.badges.rescuer.tier === 'platinum' ? 'from-purple-400 to-indigo-500' :
                                                     userStats.badges.rescuer.tier === 'gold' ? 'from-yellow-400 to-amber-500' :
-                                                    userStats.badges.rescuer.tier === 'silver' ? 'from-slate-300 to-slate-400' :
-                                                    'from-amber-600 to-orange-600'
-                                                }`}>
+                                                        userStats.badges.rescuer.tier === 'silver' ? 'from-slate-300 to-slate-400' :
+                                                            'from-amber-600 to-orange-600'
+                                                    }`}>
                                                     <HeartHandshake className="w-7 h-7 text-white" />
                                                 </div>
                                                 <div className="flex-1">
@@ -6615,12 +6610,11 @@ Respond with ONLY the JSON object, nothing else.`
                             {/* Rescuer Badge */}
                             {userStats?.badges?.rescuer?.earned && (
                                 <div className="ml-auto flex items-center gap-2">
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br ${
-                                        userStats.badges.rescuer.tier === 'platinum' ? 'from-purple-400 to-indigo-500' :
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br ${userStats.badges.rescuer.tier === 'platinum' ? 'from-purple-400 to-indigo-500' :
                                         userStats.badges.rescuer.tier === 'gold' ? 'from-yellow-400 to-amber-500' :
-                                        userStats.badges.rescuer.tier === 'silver' ? 'from-slate-300 to-slate-400' :
-                                        'from-amber-600 to-orange-600'
-                                    }`}>
+                                            userStats.badges.rescuer.tier === 'silver' ? 'from-slate-300 to-slate-400' :
+                                                'from-amber-600 to-orange-600'
+                                        }`}>
                                         <HeartHandshake className="w-4 h-4 text-white" />
                                     </div>
                                     <div>
@@ -7405,11 +7399,10 @@ Respond with ONLY the JSON object, nothing else.`
                                         <button
                                             key={cat.id}
                                             onClick={() => setFilter(cat.id)}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-                                                isActive
-                                                    ? theme === 'dark' ? 'bg-white/10 text-white' : 'bg-slate-900 text-white'
-                                                    : theme === 'dark' ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100'
-                                            }`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${isActive
+                                                ? theme === 'dark' ? 'bg-white/10 text-white' : 'bg-slate-900 text-white'
+                                                : theme === 'dark' ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100'
+                                                }`}
                                         >
                                             <Icon className="w-3.5 h-3.5" />
                                             {cat.label}
@@ -7540,6 +7533,13 @@ Respond with ONLY the JSON object, nothing else.`
             const [userToDelete, setUserToDelete] = useState(null);
             const [isDeletingUser, setIsDeletingUser] = useState(false);
 
+            // Cemetery admin state
+            const [cemeteryItems, setCemeteryItems] = useState([]);
+            const [cemeteryLoading, setCemeteryLoading] = useState(true);
+            const [cemeteryToDelete, setCemeteryToDelete] = useState(null);
+            const [isDeletingCemetery, setIsDeletingCemetery] = useState(false);
+            const [cemeteryFilter, setCemeteryFilter] = useState('all');
+
             // Theme styles
             const panelBg = theme === 'dark' ? 'bg-slate-800/50' : 'bg-white';
             const cardBg = theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50';
@@ -7602,6 +7602,19 @@ Respond with ONLY the JSON object, nothing else.`
                         setAllConversations(convos);
                     }
                 );
+                return () => unsubscribe();
+            }, []);
+
+            // Load cemetery items for admin
+            useEffect(() => {
+                const q = query(
+                    collection(db, 'artifacts', appId, 'cemetery'),
+                    orderBy('abandonedAt', 'desc')
+                );
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setCemeteryItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    setCemeteryLoading(false);
+                });
                 return () => unsubscribe();
             }, []);
 
@@ -7682,6 +7695,18 @@ Respond with ONLY the JSON object, nothing else.`
             };
 
             // Delete a specific message
+            // Delete cemetery item (admin)
+            const handleDeleteCemeteryItem = async (itemId) => {
+                setIsDeletingCemetery(true);
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'cemetery', itemId));
+                    setCemeteryToDelete(null);
+                } catch (err) {
+                    console.error('Error deleting cemetery item:', err);
+                }
+                setIsDeletingCemetery(false);
+            };
+
             const handleDeleteMessage = async (messageId) => {
                 if (!selectedConversation) return;
                 try {
@@ -7724,15 +7749,16 @@ Respond with ONLY the JSON object, nothing else.`
                     </div>
 
                     {/* Section Tabs */}
-                    <div className={`flex gap-2 p-1.5 rounded-2xl ${cardBg} mb-6`}>
+                    <div className={`flex gap-2 p-1.5 rounded-2xl ${cardBg} mb-6 overflow-x-auto`}>
                         {[
                             { id: 'posts', label: 'Posts', icon: FileText, count: allPosts.length },
                             { id: 'users', label: 'Users', icon: Users, count: allUsers.length },
-                            { id: 'messages', label: 'Messages', icon: Mail, count: allConversations.length }
+                            { id: 'messages', label: 'Messages', icon: Mail, count: allConversations.length },
+                            { id: 'cemetery', label: 'Cemetery', icon: Archive, count: cemeteryItems.length }
                         ].map(tab => (
                             <button
                                 key={tab.id}
-                                onClick={() => { setActiveSection(tab.id); setSearchQuery(''); setSelectedConversation(null); }}
+                                onClick={() => { setActiveSection(tab.id); setSearchQuery(''); setSelectedConversation(null); setCemeteryFilter('all'); }}
                                 className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all ${activeSection === tab.id
                                     ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg'
                                     : `${textSub} hover:bg-white/10`
@@ -7956,6 +7982,103 @@ Respond with ONLY the JSON object, nothing else.`
                         </div>
                     )}
 
+                    {/* CEMETERY SECTION */}
+                    {activeSection === 'cemetery' && (
+                        <div className="space-y-4">
+                            {/* Cemetery Filter Tabs */}
+                            <div className="flex gap-2 flex-wrap">
+                                {[
+                                    { id: 'all', label: 'All', icon: Layers },
+                                    { id: 'voca', label: 'Vocabulary', icon: Book },
+                                    { id: 'phrase', label: 'Phrases', icon: MessageCircle },
+                                    { id: 'synonym', label: 'Synonyms', icon: LinkIcon },
+                                    { id: 'antonym', label: 'Antonyms', icon: ArrowLeftRight }
+                                ].map(cat => {
+                                    const count = cat.id === 'all' ? cemeteryItems.length : cemeteryItems.filter(i => i.type === cat.id).length;
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => setCemeteryFilter(cat.id)}
+                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold transition-all ${cemeteryFilter === cat.id
+                                                ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+                                                : theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                }`}
+                                        >
+                                            <cat.icon className="w-4 h-4" />
+                                            {cat.label}
+                                            <span className={`px-1.5 py-0.5 rounded-full text-xs ${cemeteryFilter === cat.id ? 'bg-white/20' : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                                                {count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Cemetery Items List */}
+                            {cemeteryLoading ? (
+                                <div className="text-center py-12">
+                                    <Loader2 className={`w-8 h-8 animate-spin mx-auto ${textSub}`} />
+                                </div>
+                            ) : (cemeteryFilter === 'all' ? cemeteryItems : cemeteryItems.filter(i => i.type === cemeteryFilter)).length === 0 ? (
+                                <div className={`text-center py-12 ${textSub}`}>
+                                    <Archive className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                    <p>No items in the cemetery</p>
+                                </div>
+                            ) : (
+                                (cemeteryFilter === 'all' ? cemeteryItems : cemeteryItems.filter(i => i.type === cemeteryFilter)).map(item => (
+                                    <div key={item.id} className={`${panelBg} rounded-2xl border ${borderColor} p-4`}>
+                                        <div className="flex items-start gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                {/* Type Badge */}
+                                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase mb-2 ${item.type === 'voca' ? 'bg-indigo-500/10 text-indigo-500' :
+                                                    item.type === 'synonym' ? 'bg-violet-500/10 text-violet-500' :
+                                                        item.type === 'antonym' ? 'bg-rose-500/10 text-rose-500' :
+                                                            item.type === 'phrase' ? 'bg-amber-500/10 text-amber-500' :
+                                                                'bg-slate-500/10 text-slate-500'
+                                                    }`}>
+                                                    {item.type}
+                                                </span>
+
+                                                <h3 className={`text-lg font-bold ${textMain}`}>{item.mainText}</h3>
+                                                <p className={`text-sm ${textSub} mt-1`}>
+                                                    {item.context || item.related?.join(', ') || item.pos || 'No definition'}
+                                                </p>
+
+                                                {/* Owner Info */}
+                                                <div className="flex items-center gap-2 mt-3">
+                                                    {item.abandonedBy?.photoURL ? (
+                                                        <img src={item.abandonedBy.photoURL} className="w-5 h-5 rounded-full" alt="" />
+                                                    ) : (
+                                                        <div className="w-5 h-5 rounded-full bg-slate-500/20 flex items-center justify-center">
+                                                            <User className="w-3 h-3 text-slate-500" />
+                                                        </div>
+                                                    )}
+                                                    <span className={`text-xs ${textSub}`}>
+                                                        By {item.abandonedBy?.displayName || 'Anonymous'} ({item.abandonedBy?.uid?.slice(0, 8)}...)
+                                                    </span>
+                                                </div>
+
+                                                {/* Stats */}
+                                                <div className={`flex items-center gap-4 mt-2 text-xs ${textSub}`}>
+                                                    <span>📅 {formatTime(item.abandonedAt)}</span>
+                                                    <span>❤️ {item.adoptionCount || 0} adopted</span>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => setCemeteryToDelete(item)}
+                                                className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                                                title="Delete from cemetery"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+
                     {/* Delete Post Confirmation Modal */}
                     {deleteConfirm && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
@@ -8028,6 +8151,48 @@ Respond with ONLY the JSON object, nothing else.`
                             </div>
                         </div>
                     )}
+
+                    {/* Delete Cemetery Item Confirmation Modal */}
+                    {cemeteryToDelete && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setCemeteryToDelete(null)}>
+                            <div className={`${panelBg} rounded-3xl max-w-md w-full p-6 border ${borderColor}`} onClick={e => e.stopPropagation()}>
+                                <div className="text-center">
+                                    <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                                        <Archive className="w-8 h-8 text-red-500" />
+                                    </div>
+                                    <h3 className={`text-xl font-bold ${textMain} mb-2`}>Delete from Cemetery?</h3>
+                                    <p className={`${textSub} mb-2`}>
+                                        This will permanently delete this word from the Lost & Found:
+                                    </p>
+                                    <div className={`${cardBg} rounded-xl p-3 mb-4`}>
+                                        <div className={`font-bold ${textMain}`}>{cemeteryToDelete.mainText}</div>
+                                        <div className={`text-sm ${textSub}`}>
+                                            Originally by {cemeteryToDelete.abandonedBy?.displayName || 'Anonymous'}
+                                        </div>
+                                    </div>
+                                    <p className={`text-xs ${textSub} mb-6`}>
+                                        This word has been adopted {cemeteryToDelete.adoptionCount || 0} time(s). Deleting it will not affect users who have already adopted it.
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setCemeteryToDelete(null)}
+                                            className={`flex-1 py-3 rounded-xl font-bold ${theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteCemeteryItem(cemeteryToDelete.id)}
+                                            disabled={isDeletingCemetery}
+                                            className="flex-1 py-3 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            {isDeletingCemetery ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -8079,7 +8244,12 @@ Respond with ONLY the JSON object, nothing else.`
 
             // Cemetery / Lost & Found state
             const [isCemeteryOpen, setIsCemeteryOpen] = useState(false);
+
+            // Give up confirmation state
             const [giveUpConfirm, setGiveUpConfirm] = useState(null);
+
+            // Exit confirmation modal state (mobile back button)
+            const [showExitConfirm, setShowExitConfirm] = useState(false);
 
             // Function to view another user's profile
             const openPublicProfile = (targetUser) => {
@@ -8118,16 +8288,13 @@ Respond with ONLY the JSON object, nothing else.`
                     if (isMessengerOpen) { setIsMessengerOpen(false); return; }
                     if (reviewQueue) { setReviewQueue(null); return; }
 
-                    // No modal open — prompt exit confirmation
-                    if (window.confirm('Are you sure you want to exit the app?')) {
-                        window.removeEventListener('popstate', handlePopState);
-                        window.history.back();
-                    }
+                    // No modal open — show styled exit confirmation
+                    setShowExitConfirm(true);
                 };
 
                 window.addEventListener('popstate', handlePopState);
                 return () => window.removeEventListener('popstate', handlePopState);
-            }, [isPublicProfileOpen, isProfileModalOpen, isSharingInboxOpen, isShareModalOpen, confirmModal.isOpen, isMessengerOpen, reviewQueue, isGameOpen]);
+            }, [isPublicProfileOpen, isProfileModalOpen, isSharingInboxOpen, isShareModalOpen, confirmModal.isOpen, isMessengerOpen, reviewQueue, isGameOpen, isCemeteryOpen, giveUpConfirm]);
 
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -8602,6 +8769,40 @@ Respond with ONLY the JSON object, nothing else.`
                         onAdopt={handleAdoptWord}
                         showToast={showToast}
                     />
+
+                    {/* Exit Confirmation Modal (Mobile Back Button) */}
+                    {showExitConfirm && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4" onClick={() => setShowExitConfirm(false)}>
+                            <div className={`${theme === 'dark' ? 'bg-slate-800/95' : 'bg-white/95'} backdrop-blur-xl rounded-3xl max-w-sm w-full p-6 border ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'} shadow-2xl animate-messenger-open`} onClick={e => e.stopPropagation()}>
+                                <div className="text-center">
+                                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                                        <span className="text-4xl">👋</span>
+                                    </div>
+                                    <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-800'} mb-2`}>Leaving Already?</h3>
+                                    <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'} mb-6`}>
+                                        Don't forget to come back and continue your learning journey! 📚
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShowExitConfirm(false)}
+                                            className={`flex-1 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white' : 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white'} shadow-lg`}
+                                        >
+                                            Stay 💪
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowExitConfirm(false);
+                                                window.history.back();
+                                            }}
+                                            className={`flex-1 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}
+                                        >
+                                            Exit
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Toast Notifications */}
                     <ToastContainer toasts={toasts} removeToast={removeToast} theme={theme} />
