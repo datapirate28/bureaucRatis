@@ -426,7 +426,9 @@
             signInWithRedirect,
             getRedirectResult,
             linkWithPopup,
-            signOut
+            signOut,
+            browserLocalPersistence,
+            setPersistence
         } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
         import {
             getFirestore,
@@ -468,6 +470,11 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        // Set persistence for better Android compatibility
+        setPersistence(auth, browserLocalPersistence).catch(err => {
+            console.log('Persistence setting failed:', err);
+        });
         const appId = 'fluency-flow-standalone';
 
         // --- ADMIN CONFIG ---
@@ -9123,10 +9130,51 @@ Respond with ONLY the JSON object, nothing else.`
                 return /Android/i.test(navigator.userAgent);
             };
 
+            // Detect if running in an in-app browser (WebView) which has auth issues
+            const isInAppBrowser = () => {
+                const ua = navigator.userAgent || navigator.vendor || window.opera;
+                // Common in-app browser indicators
+                const inAppIndicators = [
+                    'FBAN', 'FBAV',           // Facebook
+                    'Instagram',               // Instagram
+                    'Twitter',                 // Twitter
+                    'Line/',                   // Line
+                    'KAKAOTALK',              // KakaoTalk
+                    'WhatsApp',               // WhatsApp (rare but possible)
+                    'Snapchat',               // Snapchat
+                    'TikTok',                 // TikTok
+                    'wv',                     // Android WebView marker
+                    'WebView',                // Generic WebView
+                    'GSA/',                   // Google Search App
+                    'DuckDuckGo'              // DuckDuckGo browser
+                ];
+                return inAppIndicators.some(indicator => ua.includes(indicator));
+            };
+
+            // Check if browser supports popups (some mobile browsers block them entirely)
+            const canUsePopup = () => {
+                // iOS Safari and most desktop browsers support popups
+                if (isIOS()) return true;
+                // Android in-app browsers typically block popups
+                if (isAndroid() && isInAppBrowser()) return false;
+                // Regular Android Chrome should support popups
+                return true;
+            };
+
             // Handle redirect result on page load (for Android auth)
             useEffect(() => {
+                // Check if we're returning from an auth redirect
+                let authWasPending = false;
+                try {
+                    authWasPending = sessionStorage.getItem('auth_pending') === 'true';
+                } catch (e) {}
+
                 getRedirectResult(auth).then(async (result) => {
+                    // Clear the pending flag
+                    try { sessionStorage.removeItem('auth_pending'); } catch (e) {}
+
                     if (result?.user) {
+                        console.log('Redirect auth successful');
                         const u = result.user;
                         setUser(u);
                         setLoading(false);
@@ -9143,11 +9191,30 @@ Respond with ONLY the JSON object, nothing else.`
                         } catch (err) {
                             console.log('Could not sync user to chatUsers:', err);
                         }
+                    } else if (authWasPending) {
+                        // Auth was pending but no result - might have failed silently
+                        console.log('Auth was pending but no redirect result');
+                        // Don't set error here - onAuthStateChanged will handle if user is logged in
                     }
                 }).catch((error) => {
                     console.error('Redirect auth error:', error);
-                    if (error.code !== 'auth/popup-closed-by-user') {
-                        setAuthError(error.message);
+                    // Clear the pending flag
+                    try { sessionStorage.removeItem('auth_pending'); } catch (e) {}
+
+                    // Provide better error messages for Android users
+                    if (error.code === 'auth/web-storage-unsupported') {
+                        setAuthError('Please enable cookies in your browser settings and try again.');
+                    } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
+                        setAuthError('Login not supported in this browser. Please open in Chrome or Safari.');
+                    } else if (error.code === 'auth/network-request-failed') {
+                        setAuthError('Network error. Please check your connection and try again.');
+                    } else if (error.code !== 'auth/popup-closed-by-user') {
+                        // For Android, suggest opening in Chrome
+                        if (isAndroid()) {
+                            setAuthError('Login failed. Try opening this page directly in Chrome browser.');
+                        } else {
+                            setAuthError(error.message);
+                        }
                     }
                     setLoading(false);
                 });
@@ -9162,25 +9229,59 @@ Respond with ONLY the JSON object, nothing else.`
                 // Force account selection for better UX
                 provider.setCustomParameters({ prompt: 'select_account' });
 
+                // Store auth attempt info in sessionStorage for redirect recovery
                 try {
-                    // iOS Safari: Use popup (redirect fails due to ITP)
-                    // Android: Use redirect (popup often blocked)
-                    // Desktop: Use popup
+                    sessionStorage.setItem('auth_pending', 'true');
+                    sessionStorage.setItem('auth_timestamp', Date.now().toString());
+                } catch (e) {
+                    console.log('SessionStorage not available');
+                }
+
+                try {
+                    // Strategy:
+                    // - iOS: Use popup (redirect fails due to ITP)
+                    // - Android in-app browsers (WebView): Use redirect (popups are blocked)
+                    // - Android Chrome/Firefox: Try popup first, fallback to redirect
+                    // - Desktop: Use popup
+
                     if (isAndroid()) {
-                        await signInWithRedirect(auth, provider);
+                        if (isInAppBrowser()) {
+                            // In-app browsers (Facebook, Instagram, etc.) - redirect only
+                            console.log('Android in-app browser detected, using redirect');
+                            await signInWithRedirect(auth, provider);
+                        } else {
+                            // Regular Android browser - try popup first for better UX
+                            console.log('Android browser detected, trying popup first');
+                            try {
+                                await signInWithPopup(auth, provider);
+                            } catch (popupErr) {
+                                console.log('Popup failed on Android, trying redirect:', popupErr.code);
+                                if (popupErr.code === 'auth/popup-blocked' ||
+                                    popupErr.code === 'auth/popup-closed-by-user' ||
+                                    popupErr.code === 'auth/cancelled-popup-request') {
+                                    // Popup didn't work, try redirect
+                                    await signInWithRedirect(auth, provider);
+                                } else {
+                                    throw popupErr;
+                                }
+                            }
+                        }
                     } else {
                         // iOS and Desktop use popup
                         await signInWithPopup(auth, provider);
                     }
                 } catch (err) {
                     console.error('Login error:', err);
+                    // Clear pending auth flag
+                    try { sessionStorage.removeItem('auth_pending'); } catch (e) {}
+
                     // Handle specific error cases
                     if (err.code === 'auth/popup-blocked') {
                         // Try redirect as fallback if popup is blocked
                         try {
                             await signInWithRedirect(auth, provider);
                         } catch (redirectErr) {
-                            setAuthError('Login failed. Please enable popups or try a different browser.');
+                            setAuthError('Login failed. Please open this page in Chrome or Safari and try again.');
                         }
                     } else if (err.code === 'auth/popup-closed-by-user') {
                         // User closed the popup, don't show error
@@ -9192,8 +9293,18 @@ Respond with ONLY the JSON object, nothing else.`
                         setAuthError('Network error. Please check your internet connection.');
                     } else if (err.code === 'auth/unauthorized-domain') {
                         setAuthError('This domain is not authorized. Please contact support.');
+                    } else if (err.code === 'auth/operation-not-supported-in-this-environment') {
+                        // Common in WebViews - suggest opening in real browser
+                        setAuthError('Login not supported in this browser. Please open in Chrome or Safari.');
+                    } else if (err.code === 'auth/web-storage-unsupported') {
+                        setAuthError('Please enable cookies and try again.');
                     } else {
-                        setAuthError(err.message || 'Login failed. Please try again.');
+                        // For Android, provide more helpful error message
+                        if (isAndroid()) {
+                            setAuthError('Login failed. If you\'re in an app, try opening this page in Chrome.');
+                        } else {
+                            setAuthError(err.message || 'Login failed. Please try again.');
+                        }
                     }
                 }
             };
@@ -9277,12 +9388,24 @@ Respond with ONLY the JSON object, nothing else.`
                 setReviewQueue(shuffled);
             };
 
+            // Check if returning from auth redirect
+            const isAuthPending = (() => {
+                try { return sessionStorage.getItem('auth_pending') === 'true'; } catch (e) { return false; }
+            })();
+
             if (loading) return (
                 <div className="h-screen flex flex-col items-center justify-center text-indigo-400 bg-slate-900">
-                    <div className="animate-pulse text-xl mb-4">Loading...</div>
+                    <div className="animate-pulse text-xl mb-4">
+                        {isAuthPending ? 'Signing in...' : 'Loading...'}
+                    </div>
                     {isOffline && (
                         <div className="text-amber-400 text-sm mt-2 text-center px-4">
                             You appear to be offline. Please check your internet connection.
+                        </div>
+                    )}
+                    {authError && (
+                        <div className="text-red-400 text-sm mt-4 text-center px-4 max-w-md">
+                            {authError}
                         </div>
                     )}
                 </div>
