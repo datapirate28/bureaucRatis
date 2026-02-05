@@ -423,6 +423,8 @@
             signInWithCustomToken,
             GoogleAuthProvider,
             signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
             linkWithPopup,
             signOut
         } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
@@ -8631,13 +8633,70 @@ Respond with ONLY the JSON object, nothing else.`
                 return () => window.removeEventListener('popstate', handlePopState);
             }, [isPublicProfileOpen, isProfileModalOpen, isSharingInboxOpen, isShareModalOpen, confirmModal.isOpen, isMessengerOpen, reviewQueue, isGameOpen, isCemeteryOpen, giveUpConfirm]);
 
+            // Network connectivity state
+            const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
             useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                const handleOnline = () => setIsOffline(false);
+                const handleOffline = () => setIsOffline(true);
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+                return () => {
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                };
+            }, []);
+
+            useEffect(() => {
+                let timeoutId;
+
+                // Auth timeout - if Firebase doesn't respond in 15 seconds, show error
+                timeoutId = setTimeout(() => {
+                    if (loading) {
+                        setLoading(false);
+                        setAuthError('Connection timeout. Please check your internet connection and refresh the page.');
+                    }
+                }, 15000);
+
+                const unsubscribe = onAuthStateChanged(auth, async (u) => {
+                    clearTimeout(timeoutId);
                     setUser(u);
                     setLoading(false);
-                    if (u) checkStreak(u);
+                    setAuthError(null);
+                    if (u) {
+                        checkStreak(u);
+                        // Auto-register user to chatUsers for admin panel visibility
+                        try {
+                            await setDoc(doc(db, 'artifacts', appId, 'chatUsers', u.uid), {
+                                uid: u.uid,
+                                displayName: u.displayName || 'Anonymous',
+                                photoURL: u.photoURL || '',
+                                email: u.email || '',
+                                lastSeen: Date.now(),
+                                createdAt: Date.now()
+                            }, { merge: true });
+                        } catch (err) {
+                            console.log('Could not sync user to chatUsers:', err);
+                        }
+                    }
+                }, (error) => {
+                    // Handle auth errors
+                    clearTimeout(timeoutId);
+                    setLoading(false);
+                    console.error('Auth error:', error);
+                    if (error.code === 'auth/network-request-failed') {
+                        setAuthError('Network error. Please check your internet connection.');
+                    } else if (error.code === 'auth/too-many-requests') {
+                        setAuthError('Too many requests. Please try again later.');
+                    } else {
+                        setAuthError('Authentication failed. Please refresh and try again.');
+                    }
                 });
-                return () => unsubscribe();
+
+                return () => {
+                    clearTimeout(timeoutId);
+                    unsubscribe();
+                };
             }, []);
 
             // Time Tracking
@@ -9049,16 +9108,85 @@ Respond with ONLY the JSON object, nothing else.`
                 }
             };
 
+            // Detect mobile browsers for auth redirect
+            const isMobileBrowser = () => {
+                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                    (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+            };
+
+            // Handle redirect result on page load (for mobile auth)
+            useEffect(() => {
+                getRedirectResult(auth).then(async (result) => {
+                    if (result?.user) {
+                        const u = result.user;
+                        setUser(u);
+                        setLoading(false);
+                        // Sync user to chatUsers (for admin panel)
+                        try {
+                            await setDoc(doc(db, 'artifacts', appId, 'chatUsers', u.uid), {
+                                uid: u.uid,
+                                displayName: u.displayName || 'Anonymous',
+                                photoURL: u.photoURL || '',
+                                email: u.email || '',
+                                lastSeen: Date.now(),
+                                createdAt: Date.now()
+                            }, { merge: true });
+                        } catch (err) {
+                            console.log('Could not sync user to chatUsers:', err);
+                        }
+                    }
+                }).catch((error) => {
+                    console.error('Redirect auth error:', error);
+                    if (error.code !== 'auth/popup-closed-by-user') {
+                        setAuthError(error.message);
+                    }
+                    setLoading(false);
+                });
+            }, []);
+
             const handleLogin = async () => {
                 if (window.location.protocol === 'file:') {
                     showToast("Google Login requires a server. Please use the 'Live Server' extension in VS Code.", 'warning');
                     return;
                 }
                 const provider = new GoogleAuthProvider();
-                try { await signInWithPopup(auth, provider); } catch (err) { setAuthError(err.message); }
+                try {
+                    // Use redirect for mobile (more reliable, avoids popup/cookie issues)
+                    if (isMobileBrowser()) {
+                        await signInWithRedirect(auth, provider);
+                    } else {
+                        await signInWithPopup(auth, provider);
+                    }
+                } catch (err) {
+                    console.error('Login error:', err);
+                    // If popup fails, try redirect as fallback
+                    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+                        try {
+                            await signInWithRedirect(auth, provider);
+                        } catch (redirectErr) {
+                            setAuthError(redirectErr.message);
+                        }
+                    } else {
+                        setAuthError(err.message);
+                    }
+                }
             };
 
-            const handleLogout = async () => { await signOut(auth); window.location.reload(); };
+            const handleLogout = async () => {
+                try {
+                    await signOut(auth);
+                    // Reset state instead of hard reload
+                    setItems([]);
+                    setActiveTab('landing');
+                    setReviewQueue(null);
+                    setIsMessengerOpen(false);
+                    setIsProfileModalOpen(false);
+                    setIsPublicProfileOpen(false);
+                } catch (err) {
+                    console.error('Logout error:', err);
+                    showToast('Failed to logout. Please try again.', 'error');
+                }
+            };
 
             const handleLoadDemo = async () => {
                 if (!user) return;
@@ -9123,7 +9251,16 @@ Respond with ONLY the JSON object, nothing else.`
                 setReviewQueue(shuffled);
             };
 
-            if (loading) return <div className="h-screen flex items-center justify-center text-indigo-400 bg-slate-900">Loading...</div>;
+            if (loading) return (
+                <div className="h-screen flex flex-col items-center justify-center text-indigo-400 bg-slate-900">
+                    <div className="animate-pulse text-xl mb-4">Loading...</div>
+                    {isOffline && (
+                        <div className="text-amber-400 text-sm mt-2 text-center px-4">
+                            You appear to be offline. Please check your internet connection.
+                        </div>
+                    )}
+                </div>
+            );
             if (!user) return (
                 <>
                     <div className="fixed inset-0 z-[-1] bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-300 via-purple-300 to-orange-200"></div>
