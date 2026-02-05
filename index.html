@@ -411,7 +411,7 @@
             Moon, Sun, Upload, Pencil, Send, Users, MessageSquare, Circle, Heart, UserPlus, UserMinus, UserCheck,
             CheckCheck, Image as ImageIcon, MessagesSquare, Share2, Inbox, Gift, Package, FileText, ExternalLink, Eye,
             Shield, Ban, Mail, AlertCircle, RefreshCw, Copy,
-            Archive, Flag, HeartHandshake
+            Archive, Flag, HeartHandshake, BarChart3, Calendar, Target
         } from 'lucide-react';
 
         // Import Firebase
@@ -537,62 +537,66 @@
             const btnBg = theme === 'dark' ? "bg-white/5 hover:bg-indigo-500/20 text-gray-400 hover:text-indigo-300" : "bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600";
 
             return (
-                <div className={`${cardClass} p-3 rounded-2xl border flex items-center gap-3 transition-all duration-300 group`}>
-                    <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-md shrink-0 relative`}>
-                        <Icon className="w-6 h-6" />
-                        {sharedBy && (
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-800 flex items-center justify-center" title={`Shared by ${sharedBy.displayName}`}>
-                                <Share2 className="w-3 h-3 text-white" />
-                            </div>
-                        )}
-                        {adoptedFrom && (
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500 border-2 border-white dark:border-slate-800 flex items-center justify-center" title={`Rescued from ${adoptedFrom.originalOwner?.displayName || 'Lost & Found'}`}>
-                                <HeartHandshake className="w-3 h-3 text-white" />
-                            </div>
-                        )}
+                <div className={`${cardClass} p-3 rounded-2xl border flex flex-col gap-2 transition-all duration-300 group`}>
+                    {/* Top Row: Icon + Content */}
+                    <div className="flex items-center gap-3">
+                        <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-md shrink-0 relative`}>
+                            <Icon className="w-6 h-6" />
+                            {sharedBy && (
+                                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-800 flex items-center justify-center" title={`Shared by ${sharedBy.displayName}`}>
+                                    <Share2 className="w-3 h-3 text-white" />
+                                </div>
+                            )}
+                            {adoptedFrom && (
+                                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500 border-2 border-white dark:border-slate-800 flex items-center justify-center" title={`Rescued from ${adoptedFrom.originalOwner?.displayName || 'Lost & Found'}`}>
+                                    <HeartHandshake className="w-3 h-3 text-white" />
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h4 className={`text-lg font-bold ${textMain} truncate`}>{title}</h4>
+                            <p className={`${textSub} text-xs font-medium mt-0.5 truncate`}>{subtitle}</p>
+                            {sharedBy && (
+                                <div className="flex items-center gap-1.5 mt-2">
+                                    {sharedBy.photoURL ? (
+                                        <img src={sharedBy.photoURL} className="w-4 h-4 rounded-full" alt="" />
+                                    ) : (
+                                        <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                            <User className="w-2.5 h-2.5 text-emerald-500" />
+                                        </div>
+                                    )}
+                                    <span className="text-xs font-medium text-emerald-500">
+                                        Shared by {sharedBy.displayName}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <h4 className={`text-lg font-bold ${textMain} truncate`}>{title}</h4>
-                        <p className={`${textSub} text-xs font-medium mt-0.5 truncate`}>{subtitle}</p>
-                        {sharedBy && (
-                            <div className="flex items-center gap-1.5 mt-2">
-                                {sharedBy.photoURL ? (
-                                    <img src={sharedBy.photoURL} className="w-4 h-4 rounded-full" alt="" />
-                                ) : (
-                                    <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                        <User className="w-2.5 h-2.5 text-emerald-500" />
-                                    </div>
-                                )}
-                                <span className="text-xs font-medium text-emerald-500">
-                                    Shared by {sharedBy.displayName}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex flex-row flex-wrap gap-2 sm:gap-1.5 justify-end max-w-[110px] sm:max-w-[90px]">
+                    {/* Bottom Row: Action Buttons */}
+                    <div className="flex flex-row gap-2 justify-end pt-1">
                         {onSpeak && (
-                            <button onClick={onSpeak} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
-                                <Volume2 className="w-5 h-5 sm:w-4 sm:h-4" />
+                            <button onClick={onSpeak} className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
+                                <Volume2 className="w-4 h-4" />
                             </button>
                         )}
                         {onShare && (
-                            <button onClick={onShare} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-500 hover:text-emerald-600'}`} title="Share to Peers">
-                                <Share2 className="w-5 h-5 sm:w-4 sm:h-4" />
+                            <button onClick={onShare} className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-500 hover:text-emerald-600'}`} title="Share to Peers">
+                                <Share2 className="w-4 h-4" />
                             </button>
                         )}
                         {onGiveUp && !sharedBy && (
-                            <button onClick={onGiveUp} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300' : 'bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600'}`} title="Let it go to Lost & Found">
-                                <Flag className="w-5 h-5 sm:w-4 sm:h-4" />
+                            <button onClick={onGiveUp} className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300' : 'bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600'}`} title="Let it go to Lost & Found">
+                                <Flag className="w-4 h-4" />
                             </button>
                         )}
                         {onEdit && (
-                            <button onClick={onEdit} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
-                                <Pencil className="w-5 h-5 sm:w-4 sm:h-4" />
+                            <button onClick={onEdit} className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
+                                <Pencil className="w-4 h-4" />
                             </button>
                         )}
                         {onDelete && (
-                            <button onClick={onDelete} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300' : 'bg-rose-50 hover:bg-rose-100 text-rose-500 hover:text-rose-600'}`}>
-                                <Trash2 className="w-5 h-5 sm:w-4 sm:h-4" />
+                            <button onClick={onDelete} className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300' : 'bg-rose-50 hover:bg-rose-100 text-rose-500 hover:text-rose-600'}`}>
+                                <Trash2 className="w-4 h-4" />
                             </button>
                         )}
                     </div>
@@ -1099,6 +1103,65 @@
                 }
             }, [players, isHost, status, gameId]);
 
+            // Track game stats when game finishes
+            const [statsUpdated, setStatsUpdated] = useState(false);
+            useEffect(() => {
+                const updateGameStats = async () => {
+                    if (view !== 'results' || statsUpdated || !user || players.length === 0) return;
+
+                    setStatsUpdated(true);
+
+                    try {
+                        // Find current user's rank
+                        const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+                        const myRank = sortedPlayers.findIndex(p => p.uid === user.uid);
+                        const isWinner = myRank === 0 && sortedPlayers.length > 1;
+                        const myPlayer = sortedPlayers.find(p => p.uid === user.uid);
+                        const myScore = myPlayer?.score || 0;
+
+                        // Update user's stats
+                        const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'metadata', 'stats');
+                        const statsSnap = await getDoc(statsRef);
+                        const currentStats = statsSnap.exists() ? statsSnap.data() : {};
+
+                        const newGamesPlayed = (currentStats.gamesPlayed || 0) + 1;
+                        const newGamesWon = (currentStats.gamesWon || 0) + (isWinner ? 1 : 0);
+                        const newGamesLost = (currentStats.gamesLost || 0) + (isWinner ? 0 : 1);
+                        const newTotalScore = (currentStats.totalGameScore || 0) + myScore;
+                        const newHighestScore = Math.max(currentStats.highestGameScore || 0, myScore);
+
+                        await setDoc(statsRef, {
+                            gamesPlayed: newGamesPlayed,
+                            gamesWon: newGamesWon,
+                            gamesLost: newGamesLost,
+                            totalGameScore: newTotalScore,
+                            highestGameScore: newHighestScore
+                        }, { merge: true });
+
+                        // Update leaderboard
+                        const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', user.uid);
+                        await setDoc(leaderboardRef, {
+                            uid: user.uid,
+                            displayName: user.displayName || 'Anonymous',
+                            photoURL: user.photoURL || '',
+                            gamesPlayed: newGamesPlayed,
+                            gamesWon: newGamesWon,
+                            winRate: newGamesPlayed > 0 ? (newGamesWon / newGamesPlayed) : 0,
+                            totalScore: newTotalScore,
+                            daysActive: currentStats.daysActive || 1,
+                            wordsLearned: items?.length || 0,
+                            updatedAt: Date.now()
+                        }, { merge: true });
+
+                    } catch (err) {
+                        console.error('Error updating game stats:', err);
+                    }
+                };
+
+                updateGameStats();
+            }, [view, statsUpdated, user, players, items]);
+
+
             const generateQuestions = () => {
                 const pool = items.filter(i => i.mainText && i.type !== 'phrase');
                 if (pool.length < 4) return [];
@@ -1593,7 +1656,154 @@
             );
         };
 
-        const Dashboard = ({ items, onReview, dueCount, onLoadDemo, isAdding, onFlashcards, theme, onStartGame }) => {
+        // --- STATS CARD COMPONENT ---
+        const StatsCard = ({ user, theme }) => {
+            const [userStats, setUserStats] = useState(null);
+
+            useEffect(() => {
+                if (!user) return;
+                const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'metadata', 'stats');
+                const unsubscribe = onSnapshot(statsRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        setUserStats(docSnap.data());
+                    }
+                });
+                return () => unsubscribe();
+            }, [user]);
+
+            const cardBg = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
+            const textColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const subText = theme === 'dark' ? 'text-gray-400' : 'text-slate-500';
+
+            const winRate = userStats?.gamesPlayed > 0
+                ? Math.round((userStats.gamesWon / userStats.gamesPlayed) * 100)
+                : 0;
+
+            const stats = [
+                { label: 'Days Active', value: userStats?.daysActive || 0, icon: Calendar, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                { label: 'Games Played', value: userStats?.gamesPlayed || 0, icon: Zap, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+                { label: 'Games Won', value: userStats?.gamesWon || 0, icon: Trophy, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+                { label: 'Win Rate', value: `${winRate}%`, icon: Target, color: 'text-amber-500', bg: 'bg-amber-500/10' }
+            ];
+
+            return (
+                <div className={`${cardBg} p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-lg border ${theme === 'dark' ? 'border-white/5' : 'border-white/50'}`}>
+                    <div className="flex items-center gap-2 mb-4">
+                        <BarChart3 className={`w-5 h-5 ${theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                        <h3 className={`font-bold text-base sm:text-lg ${textColor}`}>Your Statistics</h3>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                        {stats.map((stat, idx) => (
+                            <div key={idx} className={`flex flex-col items-center p-3 sm:p-4 rounded-xl sm:rounded-2xl ${theme === 'dark' ? 'bg-white/5' : 'bg-slate-50'} transition-transform hover:scale-105`}>
+                                <div className={`${stat.bg} p-2 sm:p-3 rounded-xl mb-2`}>
+                                    <stat.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.color}`} />
+                                </div>
+                                <div className={`text-xl sm:text-2xl font-black ${textColor}`}>{stat.value}</div>
+                                <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${subText} text-center`}>{stat.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- LEADERBOARD COMPONENT ---
+        const Leaderboard = ({ user, theme }) => {
+            const [leaders, setLeaders] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const q = query(
+                    collection(db, 'artifacts', appId, 'leaderboard'),
+                    orderBy('totalScore', 'desc'),
+                    limit(10)
+                );
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setLeaders(data);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            const cardBg = theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light';
+            const textColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const subText = theme === 'dark' ? 'text-gray-400' : 'text-slate-500';
+
+            const getRankBadge = (idx) => {
+                if (idx === 0) return 'bg-gradient-to-br from-yellow-400 to-amber-500 text-yellow-950';
+                if (idx === 1) return 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-800';
+                if (idx === 2) return 'bg-gradient-to-br from-amber-600 to-amber-700 text-amber-100';
+                return theme === 'dark' ? 'bg-white/10 text-white/60' : 'bg-slate-200 text-slate-600';
+            };
+
+            return (
+                <div className={`${cardBg} p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-lg border ${theme === 'dark' ? 'border-white/5' : 'border-white/50'}`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Trophy className={`w-5 h-5 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
+                            <h3 className={`font-bold text-base sm:text-lg ${textColor}`}>Leaderboard</h3>
+                        </div>
+                        <span className={`text-xs font-bold ${subText} uppercase tracking-wider`}>Top 10</span>
+                    </div>
+
+                    {loading ? (
+                        <div className="flex justify-center py-8">
+                            <Loader2 className={`w-6 h-6 animate-spin ${subText}`} />
+                        </div>
+                    ) : leaders.length === 0 ? (
+                        <div className={`text-center py-8 ${subText}`}>
+                            <Trophy className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                            <p className="text-sm">No rankings yet. Play a game to get on the leaderboard!</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {leaders.map((leader, idx) => (
+                                <div
+                                    key={leader.id}
+                                    className={`flex items-center gap-3 p-2 sm:p-3 rounded-xl transition-all ${leader.uid === user?.uid
+                                        ? theme === 'dark'
+                                            ? 'bg-indigo-500/20 border border-indigo-500/30'
+                                            : 'bg-indigo-50 border border-indigo-200'
+                                        : theme === 'dark'
+                                            ? 'hover:bg-white/5'
+                                            : 'hover:bg-slate-50'
+                                        }`}
+                                >
+                                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center font-black text-xs sm:text-sm ${getRankBadge(idx)}`}>
+                                        {idx + 1}
+                                    </div>
+                                    {leader.photoURL ? (
+                                        <img src={leader.photoURL} alt="" className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-white/20" />
+                                    ) : (
+                                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full ${theme === 'dark' ? 'bg-indigo-500/20' : 'bg-indigo-100'} flex items-center justify-center`}>
+                                            <User className="w-4 h-4 text-indigo-500" />
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <div className={`font-bold text-sm truncate ${textColor}`}>
+                                            {leader.displayName}
+                                            {leader.uid === user?.uid && (
+                                                <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-indigo-500/30 text-indigo-300' : 'bg-indigo-100 text-indigo-600'}`}>You</span>
+                                            )}
+                                        </div>
+                                        <div className={`text-[10px] sm:text-xs ${subText}`}>
+                                            {leader.gamesWon || 0} wins • {Math.round((leader.winRate || 0) * 100)}% win rate
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className={`font-black text-base sm:text-lg font-mono ${textColor}`}>{leader.totalScore || 0}</div>
+                                        <div className={`text-[9px] sm:text-[10px] font-bold uppercase ${subText}`}>Score</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const Dashboard = ({ items, onReview, dueCount, onLoadDemo, isAdding, onFlashcards, theme, onStartGame, user }) => {
             const stats = useMemo(() => {
                 const total = items.length;
                 const mastered = items.filter(i => i.interval > 21).length;
@@ -1690,6 +1900,12 @@
                             <div className="bg-amber-500/10 p-3 sm:p-4 rounded-xl sm:rounded-2xl"><Zap className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-amber-500" /></div>
                             <div><div className={`text-2xl sm:text-3xl md:text-4xl font-black ${textColor}`}>{stats.learning}</div><div className={`text-xs sm:text-sm font-bold uppercase tracking-wider ${subText}`}>Learning</div></div>
                         </div>
+                    </div>
+
+                    {/* User Stats and Leaderboard */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                        <StatsCard user={user} theme={theme} />
+                        <Leaderboard user={user} theme={theme} />
                     </div>
 
                     <div className={`${cardBg} p-5 sm:p-6 md:p-8 rounded-[1.5rem] sm:rounded-[2rem] md:rounded-[2.5rem] shadow-xl border ${theme === 'dark' ? 'border-white/5' : 'border-white/50'}`}>
@@ -5332,7 +5548,7 @@ Respond with ONLY the JSON object, nothing else.`
                                                                             )}
                                                                         </div>
                                                                     </div>
-                                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); onViewProfile && onViewProfile(friend); }}
                                                                             className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-violet-500/20 hover:bg-violet-500/30' : 'bg-violet-100 hover:bg-violet-200'} transition-colors`}
@@ -5465,7 +5681,7 @@ Respond with ONLY the JSON object, nothing else.`
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                                                     <button
                                                                         onClick={() => onViewProfile && onViewProfile(userItem)}
                                                                         className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-violet-500/20 hover:bg-violet-500/30' : 'bg-violet-100 hover:bg-violet-200'} transition-colors`}
@@ -6053,6 +6269,15 @@ Respond with ONLY the JSON object, nothing else.`
             );
         };
 
+        // Helper to format time spent
+        const formatTimeSpent = (totalSeconds) => {
+            if (!totalSeconds) return '0m';
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        };
+
         // --- USER PROFILE MODAL ---
         // Modal for viewing and editing user profile, showing statistics
         const UserProfileModal = ({ isOpen, onClose, user, theme, items, onSaveProfile }) => {
@@ -6371,6 +6596,54 @@ Respond with ONLY the JSON object, nothing else.`
                                         </div>
                                     )}
 
+                                    {/* Activity Stats */}
+                                    <div className="mb-6">
+                                        <h4 className={`font-bold ${textMain} mb-4 flex items-center gap-2`}>
+                                            <Activity className="w-5 h-5 text-blue-500" />
+                                            Activity
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                <div className={`text-2xl font-black ${textMain}`}>{userStats?.daysActive || 1}</div>
+                                                <div className={`text-xs font-bold ${textSub} uppercase`}>Days Active</div>
+                                            </div>
+                                            <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                <div className={`text-2xl font-black ${textMain}`}>{formatTimeSpent(userStats?.totalTimeSpent)}</div>
+                                                <div className={`text-xs font-bold ${textSub} uppercase`}>Time Spent</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Game Statistics */}
+                                    {(userStats?.gamesPlayed > 0) && (
+                                        <div className="mb-6">
+                                            <h4 className={`font-bold ${textMain} mb-4 flex items-center gap-2`}>
+                                                <Target className="w-5 h-5 text-red-500" />
+                                                Game Statistics
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-3 mb-3">
+                                                <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                    <div className={`text-2xl font-black ${textMain}`}>{userStats.gamesPlayed || 0}</div>
+                                                    <div className={`text-xs font-bold ${textSub} uppercase`}>Played</div>
+                                                </div>
+                                                <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                    <div className="text-2xl font-black text-amber-500">{userStats.highestGameScore || 0}</div>
+                                                    <div className={`text-xs font-bold ${textSub} uppercase`}>Best Score</div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                    <div className="text-2xl font-black text-emerald-500">{userStats.gamesWon || 0}</div>
+                                                    <div className={`text-xs font-bold ${textSub} uppercase`}>Won</div>
+                                                </div>
+                                                <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                    <div className={`text-2xl font-black ${textMain}`}>{Math.round(((userStats.gamesWon || 0) / (userStats.gamesPlayed || 1)) * 100)}%</div>
+                                                    <div className={`text-xs font-bold ${textSub} uppercase`}>Win Rate</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Community Stats */}
                                     {(userStats?.wordsAbandoned > 0 || userStats?.wordsAdopted > 0) && (
                                         <div className="mb-6">
@@ -6597,36 +6870,98 @@ Respond with ONLY the JSON object, nothing else.`
                             )}
                         </div>
 
-                        {/* Stats Bar */}
-                        <div className={`px-6 py-4 border-b ${borderColor} flex items-center gap-6 shrink-0`}>
-                            <div className="text-center">
-                                <div className={`text-xl font-black ${textMain}`}>{stats.total}</div>
-                                <div className={`text-xs ${textSub}`}>Total Items</div>
+                        {/* General Stats Grid */}
+                        <div className={`px-4 py-3 border-b ${borderColor} bg-opacity-30 ${theme === 'dark' ? 'bg-slate-900/30' : 'bg-slate-50/50'}`}>
+                            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                                {/* Total Items */}
+                                <div className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl sm:rounded-2xl border transition-all ${theme === 'dark' ? 'bg-blue-500/5 border-blue-500/20 shadow-[0_0_15px_-5px_rgba(59,130,246,0.2)]' : 'bg-white border-blue-100 shadow-sm'}`}>
+                                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                                        <Book className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
+                                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-blue-500/80 tracking-wide">Items</span>
+                                    </div>
+                                    <div className={`text-lg sm:text-2xl font-black ${textMain}`}>{stats.total}</div>
+                                </div>
+
+                                {/* Mastered */}
+                                <div className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl sm:rounded-2xl border transition-all ${theme === 'dark' ? 'bg-emerald-500/5 border-emerald-500/20 shadow-[0_0_15px_-5px_rgba(16,185,129,0.2)]' : 'bg-white border-emerald-100 shadow-sm'}`}>
+                                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                                        <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
+                                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-emerald-500/80 tracking-wide">Mastered</span>
+                                    </div>
+                                    <div className={`text-lg sm:text-2xl font-black text-emerald-500`}>{stats.mastered}</div>
+                                </div>
+
+                                {/* Time Spent */}
+                                <div className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl sm:rounded-2xl border transition-all ${theme === 'dark' ? 'bg-violet-500/5 border-violet-500/20 shadow-[0_0_15px_-5px_rgba(139,92,246,0.2)]' : 'bg-white border-violet-100 shadow-sm'}`}>
+                                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                                        <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-violet-500" />
+                                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-violet-500/80 tracking-wide">Time</span>
+                                    </div>
+                                    <div className={`text-lg sm:text-2xl font-black ${textMain}`}>{formatTimeSpent(userStats?.totalTimeSpent)}</div>
+                                </div>
                             </div>
-                            <div className="text-center">
-                                <div className="text-xl font-black text-emerald-500">{stats.mastered}</div>
-                                <div className={`text-xs ${textSub}`}>Mastered</div>
-                            </div>
-                            {/* Rescuer Badge */}
+
+                            {/* Rescuer Badge (Separate Row) */}
                             {userStats?.badges?.rescuer?.earned && (
-                                <div className="ml-auto flex items-center gap-2">
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br ${userStats.badges.rescuer.tier === 'platinum' ? 'from-purple-400 to-indigo-500' :
+                                <div className={`mt-3 flex items-center gap-3 p-3 rounded-xl border ${theme === 'dark' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-100'}`}>
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-gradient-to-br ${userStats.badges.rescuer.tier === 'platinum' ? 'from-purple-400 to-indigo-500' :
                                         userStats.badges.rescuer.tier === 'gold' ? 'from-yellow-400 to-amber-500' :
                                             userStats.badges.rescuer.tier === 'silver' ? 'from-slate-300 to-slate-400' :
                                                 'from-amber-600 to-orange-600'
                                         }`}>
-                                        <HeartHandshake className="w-4 h-4 text-white" />
+                                        <HeartHandshake className="w-5 h-5 text-white" />
                                     </div>
                                     <div>
                                         <div className={`text-sm font-bold ${textMain}`}>
                                             {userStats.badges.rescuer.tier.charAt(0).toUpperCase() + userStats.badges.rescuer.tier.slice(1)} Rescuer
                                         </div>
                                         <div className={`text-xs ${textSub}`}>
-                                            {userStats.badges.rescuer.rescueCount} rescued
+                                            Rescued {userStats.badges.rescuer.rescueCount} forgotten words
                                         </div>
                                     </div>
                                 </div>
                             )}
+                        </div>
+
+                        {/* Game Stats Bar */}
+                        <div className={`px-4 py-3 border-b ${borderColor} bg-opacity-30 ${theme === 'dark' ? 'bg-slate-900/30' : 'bg-slate-50/50'}`}>
+                            <div className="grid grid-cols-4 gap-2 sm:gap-4">
+                                {/* Played */}
+                                <div className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl sm:rounded-2xl border transition-all ${theme === 'dark' ? 'bg-indigo-500/5 border-indigo-500/20 shadow-[0_0_15px_-5px_rgba(99,102,241,0.2)]' : 'bg-white border-indigo-100 shadow-sm'}`}>
+                                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                                        <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-500" />
+                                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-indigo-500/80 tracking-wide">Played</span>
+                                    </div>
+                                    <div className={`text-lg sm:text-2xl font-black ${textMain}`}>{userStats?.gamesPlayed || 0}</div>
+                                </div>
+
+                                {/* Won */}
+                                <div className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl sm:rounded-2xl border transition-all ${theme === 'dark' ? 'bg-emerald-500/5 border-emerald-500/20 shadow-[0_0_15px_-5px_rgba(16,185,129,0.2)]' : 'bg-white border-emerald-100 shadow-sm'}`}>
+                                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                                        <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
+                                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-emerald-500/80 tracking-wide">Won</span>
+                                    </div>
+                                    <div className={`text-lg sm:text-2xl font-black ${textMain}`}>{userStats?.gamesWon || 0}</div>
+                                </div>
+
+                                {/* Lost */}
+                                <div className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl sm:rounded-2xl border transition-all ${theme === 'dark' ? 'bg-rose-500/5 border-rose-500/20 shadow-[0_0_15px_-5px_rgba(244,63,94,0.2)]' : 'bg-white border-rose-100 shadow-sm'}`}>
+                                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                                        <X className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-500" />
+                                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-rose-500/80 tracking-wide">Lost</span>
+                                    </div>
+                                    <div className={`text-lg sm:text-2xl font-black ${textMain}`}>{userStats?.gamesLost || 0}</div>
+                                </div>
+
+                                {/* Best Score */}
+                                <div className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl sm:rounded-2xl border transition-all ${theme === 'dark' ? 'bg-amber-500/5 border-amber-500/20 shadow-[0_0_15px_-5px_rgba(245,158,11,0.2)]' : 'bg-white border-amber-100 shadow-sm'}`}>
+                                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                                        <Target className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
+                                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-amber-500/80 tracking-wide">Best</span>
+                                    </div>
+                                    <div className={`text-lg sm:text-2xl font-black ${textMain}`}>{userStats?.highestGameScore || 0}</div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Category Tabs */}
@@ -8304,6 +8639,27 @@ Respond with ONLY the JSON object, nothing else.`
                 });
                 return () => unsubscribe();
             }, []);
+
+            // Time Tracking
+            useEffect(() => {
+                if (!user) return;
+
+                const interval = setInterval(async () => {
+                    const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'metadata', 'stats');
+                    try {
+                        await updateDoc(statsRef, {
+                            totalTimeSpent: increment(60)
+                        });
+                    } catch (err) {
+                        // Create if missing
+                        await setDoc(statsRef, { totalTimeSpent: 60 }, { merge: true });
+                    }
+                }, 60000); // Update every minute
+
+                return () => clearInterval(interval);
+            }, [user]);
+
+            // --- Firestore Listeners ---
             // ... (omitting unchanged useEffects) ...
             // Instead of replacing the huge chunk, I will target specific chunks with multi_replace_file_content if I could, but wait, the instruction is replace_file_content.
             // I will target the rendering part separately or try to catch state definition and useEffects here.
@@ -8371,18 +8727,75 @@ Respond with ONLY the JSON object, nothing else.`
                     const statsRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'metadata', 'stats');
                     const statsSnap = await getDoc(statsRef);
                     const today = new Date().toDateString();
+                    const todayFormatted = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
                     let newStreak = 1;
+                    let statsUpdate = {
+                        lastLogin: today,
+                    };
+
                     if (statsSnap.exists()) {
                         const data = statsSnap.data();
                         const lastLoginDate = new Date(data.lastLogin);
                         const yesterday = new Date();
                         yesterday.setDate(yesterday.getDate() - 1);
-                        if (data.lastLogin === today) { newStreak = data.currentStreak; }
-                        else if (lastLoginDate.toDateString() === yesterday.toDateString()) { newStreak = data.currentStreak + 1; }
-                        else { newStreak = 1; }
+
+                        if (data.lastLogin === today) {
+                            newStreak = data.currentStreak;
+                        }
+                        else if (lastLoginDate.toDateString() === yesterday.toDateString()) {
+                            newStreak = data.currentStreak + 1;
+                        }
+                        else {
+                            newStreak = 1;
+                        }
+
+                        // Update days active tracking
+                        const activeDates = data.activeDates || [];
+                        if (!activeDates.includes(todayFormatted)) {
+                            // Keep only last 30 days to avoid document bloat
+                            const updatedDates = [...activeDates, todayFormatted].slice(-30);
+                            statsUpdate.activeDates = updatedDates;
+                            statsUpdate.daysActive = (data.daysActive || 0) + 1;
+                        } else {
+                            statsUpdate.daysActive = data.daysActive || 1;
+                        }
+
+                        // Preserve first login date
+                        statsUpdate.firstLoginDate = data.firstLoginDate || Date.now();
+                    } else {
+                        // First time user
+                        statsUpdate.firstLoginDate = Date.now();
+                        statsUpdate.daysActive = 1;
+                        statsUpdate.activeDates = [todayFormatted];
+                        statsUpdate.gamesPlayed = 0;
+                        statsUpdate.gamesWon = 0;
+                        statsUpdate.gamesLost = 0;
+                        statsUpdate.totalGameScore = 0;
+                        statsUpdate.highestGameScore = 0;
                     }
-                    await setDoc(statsRef, { lastLogin: today, currentStreak: newStreak }, { merge: true });
+
+                    statsUpdate.currentStreak = newStreak;
+                    await setDoc(statsRef, statsUpdate, { merge: true });
                     setStreak(newStreak);
+
+                    // Update leaderboard entry for this user
+                    const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', currentUser.uid);
+                    const existingStats = statsSnap.exists() ? statsSnap.data() : {};
+                    await setDoc(leaderboardRef, {
+                        uid: currentUser.uid,
+                        displayName: currentUser.displayName || 'Anonymous',
+                        photoURL: currentUser.photoURL || '',
+                        gamesPlayed: existingStats.gamesPlayed || 0,
+                        gamesWon: existingStats.gamesWon || 0,
+                        winRate: existingStats.gamesPlayed > 0
+                            ? ((existingStats.gamesWon || 0) / existingStats.gamesPlayed)
+                            : 0,
+                        totalScore: existingStats.totalGameScore || 0,
+                        daysActive: statsUpdate.daysActive || 1,
+                        wordsLearned: items?.length || 0,
+                        updatedAt: Date.now()
+                    }, { merge: true });
+
                 } catch (e) { console.error("Streak Error:", e); }
             };
 
@@ -8731,7 +9144,7 @@ Respond with ONLY the JSON object, nothing else.`
 
                     <main>
                         {activeTab === 'landing' && (<LandingPage setActiveTab={setActiveTab} theme={theme} />)}
-                        {activeTab === 'dashboard' && (<Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} onStartGame={() => setIsGameOpen(true)} />)}
+                        {activeTab === 'dashboard' && (<Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} onStartGame={() => setIsGameOpen(true)} user={user} />)}
                         {activeTab === 'mylearning' && (<MyLearning items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} user={user} onShareToPeers={handleShareToPeers} onGiveUp={setGiveUpConfirm} />)}
                         {activeTab === 'peers' && (<Peers user={user} theme={theme} onViewProfile={openPublicProfile} />)}
                         {activeTab === 'admin' && (<AdminPanel user={user} theme={theme} />)}
