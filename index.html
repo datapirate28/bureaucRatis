@@ -1039,8 +1039,8 @@
 
             const generateQuestions = () => {
                 // Generate 10 random questions from items
-                // Mix of Vocab, Synonyms, Antonyms
-                const pool = items.filter(i => i.mainText);
+                // Mix of Vocab, Synonyms, Antonyms - NO PHRASES
+                const pool = items.filter(i => i.mainText && i.type !== 'phrase');
                 if (pool.length < 4) return []; // Need at least 4 items for options
 
                 const qList = [];
@@ -1189,7 +1189,7 @@
 
             return (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-                    <div className={`${cardClass} w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative flex flex-col max-h-[90vh]`}>
+                    <div className={`${cardClass} w-full max-w-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden`}>
                         <button onClick={onClose} className="absolute top-4 right-4 opacity-50 hover:opacity-100 p-2"><X className="w-6 h-6" /></button>
 
                         {/* HEADER */}
@@ -1203,10 +1203,10 @@
                         {/* VIEW: MENU */}
                         {view === 'menu' && (
                             <div className="space-y-4 flex-1 flex flex-col justify-center">
-                                <button onClick={handleHost} className="w-full py-5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-3">
+                                <button onClick={handleHost} className="w-full py-4 sm:py-5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-lg sm:text-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-3">
                                     <Play className="w-6 h-6" /> Host Game
                                 </button>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row gap-3">
                                     <input
                                         type="text"
                                         placeholder="Enter 4-digit Code"
@@ -1225,9 +1225,9 @@
                         {/* VIEW: LOBBY */}
                         {view === 'lobby' && (
                             <div className="text-center space-y-6">
-                                <div className="bg-slate-900 text-white py-4 px-8 rounded-2xl inline-block">
-                                    <div className="text-sm opacity-70 font-bold uppercase tracking-wider">Game Code</div>
-                                    <div className="text-5xl font-black tracking-widest">{gameId}</div>
+                                <div className="bg-slate-900 text-white py-3 px-6 sm:py-4 sm:px-8 rounded-2xl inline-block">
+                                    <div className="text-xs sm:text-sm opacity-70 font-bold uppercase tracking-wider">Game Code</div>
+                                    <div className="text-4xl sm:text-5xl font-black tracking-widest">{gameId}</div>
                                 </div>
                                 <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
                                     <h3 className="font-bold mb-3 opacity-70">Players ({players.length})</h3>
@@ -1257,8 +1257,8 @@
                                     <span className="text-indigo-500">Score: {score}</span>
                                 </div>
 
-                                <div className="flex-1 flex flex-col justify-center text-center">
-                                    <h3 className="text-2xl sm:text-3xl font-bold mb-8 leading-tight">
+                                <div className="flex-1 flex flex-col justify-center text-center overflow-y-auto custom-scrollbar my-2">
+                                    <h3 className="text-xl sm:text-3xl font-bold mb-4 sm:mb-8 leading-tight">
                                         {questions[currentQIndex].text}
                                     </h3>
 
@@ -1278,7 +1278,7 @@
                                                     key={idx}
                                                     disabled={!!selectedAnswer}
                                                     onClick={() => submitAnswer(opt)}
-                                                    className={`p-6 rounded-2xl font-bold text-lg transition-all transform active:scale-95 text-left border-2 border-transparent ${btnClass}`}
+                                                    className={`p-4 sm:p-6 rounded-2xl font-bold text-base sm:text-lg transition-all transform active:scale-95 text-left border-2 border-transparent ${btnClass}`}
                                                 >
                                                     {opt}
                                                 </button>
@@ -1301,9 +1301,9 @@
                         {view === 'results' && (
                             <div className="text-center flex-1 flex flex-col items-center justify-center space-y-8">
                                 <Trophy className="w-20 h-20 text-yellow-400 animate-bounce" />
-                                <h2 className="text-4xl font-black">Game Over!</h2>
+                                <h2 className="text-3xl sm:text-4xl font-black">Game Over!</h2>
 
-                                <div className="w-full max-w-sm bg-black/10 rounded-2xl p-4">
+                                <div className="w-full max-w-sm bg-black/10 rounded-2xl p-4 overflow-y-auto max-h-[50vh]">
                                     {players.sort((a, b) => b.score - a.score).map((p, i) => (
                                         <div key={p.uid} className={`flex justify-between items-center p-3 rounded-xl mb-2 ${p.uid === user.uid ? 'bg-indigo-500 text-white shadow-lg' : 'bg-white/5'}`}>
                                             <div className="flex items-center gap-3">
