@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "bureaucratis-6a362"
+  },
+  "targets": {
+    "bureaucratis-6a362": {
+      "hosting": {
+        "main": [
+          "bureaucratis-thesmartway"
+        ]
+      }
+    }
   }
 }
