@@ -607,7 +607,7 @@
         };
 
         // --- LOGIN PAGE DESIGN (RESPONSIVE) ---
-        const LoginPage = ({ onLogin, error }) => (
+        const LoginPage = ({ onLogin, error, isLoggingIn }) => (
             <div className="min-h-screen flex flex-col items-center justify-center font-sans bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 relative overflow-hidden p-4 sm:p-6 md:p-8">
 
                 {/* Background decorative elements */}
@@ -648,11 +648,20 @@
                                     Continue with Google — <span className="text-indigo-600 block sm:inline">Make a free account.</span>
                                 </p>
 
-                                <button onClick={onLogin} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 md:py-4 rounded-xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] shadow-lg active:scale-95 group-hover:shadow-indigo-500/20 text-sm md:text-base">
-                                    <div className="p-1 md:p-1.5 bg-white rounded-full">
-                                        <svg className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
-                                    </div>
-                                    <span>Continue with Google</span>
+                                <button onClick={onLogin} disabled={isLoggingIn} className={`w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 md:py-4 rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg group-hover:shadow-indigo-500/20 text-sm md:text-base ${isLoggingIn ? 'opacity-70 cursor-wait' : 'hover:scale-[1.02] active:scale-95'}`}>
+                                    {isLoggingIn ? (
+                                        <>
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                            <span>Signing in...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="p-1 md:p-1.5 bg-white rounded-full">
+                                                <svg className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
+                                            </div>
+                                            <span>Continue with Google</span>
+                                        </>
+                                    )}
                                 </button>
 
                                 {error && <div className="mt-4 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-lg text-center border border-red-100">{error}</div>}
@@ -8540,6 +8549,7 @@ Respond with ONLY the JSON object, nothing else.`
             const [loading, setLoading] = useState(true);
             const [activeTab, setActiveTab] = useState('landing');
             const [authError, setAuthError] = useState(null);
+            const [isLoggingIn, setIsLoggingIn] = useState(false);
             const [isAdding, setIsAdding] = useState(false);
             const [streak, setStreak] = useState(1);
 
@@ -9108,28 +9118,33 @@ Respond with ONLY the JSON object, nothing else.`
                 }
             };
 
-            // Detect mobile browsers and platforms
-            const isMobileBrowser = () => {
-                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                    (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+            // Comprehensive browser and device detection
+            const getBrowserInfo = () => {
+                const ua = navigator.userAgent;
+                const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                const isAndroid = /Android/i.test(ua);
+                const isMobile = isIOS || isAndroid || /webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+                const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+                const isChrome = /Chrome/i.test(ua) && !/Edge|Edg/i.test(ua);
+                const isFirefox = /Firefox/i.test(ua);
+                const isBrave = navigator.brave !== undefined;
+                const isEdge = /Edge|Edg/i.test(ua);
+                const isInAppBrowser = /FBAN|FBAV|Instagram|Twitter|Line/i.test(ua);
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+                return { isIOS, isAndroid, isMobile, isSafari, isChrome, isFirefox, isBrave, isEdge, isInAppBrowser, isStandalone };
             };
 
-            const isIOS = () => {
-                return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            };
-
-            const isAndroid = () => {
-                return /Android/i.test(navigator.userAgent);
-            };
-
-            // Handle redirect result on page load (for Android auth)
+            // Handle redirect result on page load
             useEffect(() => {
+                setIsLoggingIn(true);
                 getRedirectResult(auth).then(async (result) => {
+                    setIsLoggingIn(false);
                     if (result?.user) {
                         const u = result.user;
                         setUser(u);
                         setLoading(false);
+                        setAuthError(null);
                         // Sync user to chatUsers (for admin panel)
                         try {
                             await setDoc(doc(db, 'artifacts', appId, 'chatUsers', u.uid), {
@@ -9145,55 +9160,113 @@ Respond with ONLY the JSON object, nothing else.`
                         }
                     }
                 }).catch((error) => {
+                    setIsLoggingIn(false);
                     console.error('Redirect auth error:', error);
-                    if (error.code !== 'auth/popup-closed-by-user') {
-                        setAuthError(error.message);
+                    // Only show error for actual failures, not user cancellations
+                    if (error.code && !['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(error.code)) {
+                        setAuthError(getAuthErrorMessage(error.code));
                     }
                     setLoading(false);
                 });
             }, []);
+
+            // Convert Firebase auth error codes to user-friendly messages
+            const getAuthErrorMessage = (errorCode) => {
+                const errorMessages = {
+                    'auth/popup-blocked': 'Popup was blocked. Please allow popups for this site and try again.',
+                    'auth/popup-closed-by-user': null, // Don't show error
+                    'auth/cancelled-popup-request': null, // Don't show error
+                    'auth/network-request-failed': 'Network error. Please check your internet connection and try again.',
+                    'auth/unauthorized-domain': 'This domain is not authorized for sign-in. Please contact support.',
+                    'auth/operation-not-allowed': 'Google sign-in is not enabled. Please contact support.',
+                    'auth/user-disabled': 'This account has been disabled. Please contact support.',
+                    'auth/internal-error': 'An internal error occurred. Please try again.',
+                    'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
+                    'auth/web-storage-unsupported': 'Please enable cookies and try again.',
+                    'auth/invalid-credential': 'Invalid credentials. Please try again.',
+                };
+                return errorMessages[errorCode] || 'Sign-in failed. Please try again.';
+            };
 
             const handleLogin = async () => {
                 if (window.location.protocol === 'file:') {
                     showToast("Google Login requires a server. Please use the 'Live Server' extension in VS Code.", 'warning');
                     return;
                 }
+
+                // Prevent double-clicks
+                if (isLoggingIn) return;
+
+                setIsLoggingIn(true);
+                setAuthError(null);
+
                 const provider = new GoogleAuthProvider();
-                // Force account selection for better UX
                 provider.setCustomParameters({ prompt: 'select_account' });
 
+                const browser = getBrowserInfo();
+                console.log('Browser info:', browser);
+
                 try {
-                    // iOS Safari: Use popup (redirect fails due to ITP)
-                    // Android: Use redirect (popup often blocked)
-                    // Desktop: Use popup
-                    if (isAndroid()) {
+                    // Decision tree for auth method:
+                    // 1. In-app browsers (Facebook, Instagram, etc.): Use redirect (popups don't work)
+                    // 2. Standalone PWA: Use redirect (popups may not work)
+                    // 3. Android Chrome/Firefox: Use redirect (more reliable)
+                    // 4. iOS Safari: Use popup (redirect fails due to ITP)
+                    // 5. iOS Chrome: Use popup (same as Safari due to WebKit)
+                    // 6. Desktop browsers: Use popup (better UX)
+                    // 7. Brave: Use popup (handles it well)
+
+                    const useRedirect = browser.isInAppBrowser ||
+                                       browser.isStandalone ||
+                                       (browser.isAndroid && !browser.isBrave);
+
+                    if (useRedirect) {
+                        console.log('Using redirect auth');
                         await signInWithRedirect(auth, provider);
+                        // Note: This will redirect away from the page, no code after this runs
                     } else {
-                        // iOS and Desktop use popup
-                        await signInWithPopup(auth, provider);
+                        console.log('Using popup auth');
+                        const result = await signInWithPopup(auth, provider);
+                        setIsLoggingIn(false);
+                        // User is signed in, onAuthStateChanged will handle the rest
+                        if (result?.user) {
+                            setAuthError(null);
+                        }
                     }
                 } catch (err) {
-                    console.error('Login error:', err);
-                    // Handle specific error cases
+                    console.error('Login error:', err.code, err.message);
+                    setIsLoggingIn(false);
+
+                    // Handle specific error cases with fallback strategies
                     if (err.code === 'auth/popup-blocked') {
-                        // Try redirect as fallback if popup is blocked
+                        // Popup blocked - try redirect as fallback
+                        console.log('Popup blocked, trying redirect...');
                         try {
+                            setIsLoggingIn(true);
                             await signInWithRedirect(auth, provider);
                         } catch (redirectErr) {
+                            setIsLoggingIn(false);
                             setAuthError('Login failed. Please enable popups or try a different browser.');
                         }
-                    } else if (err.code === 'auth/popup-closed-by-user') {
-                        // User closed the popup, don't show error
-                        console.log('User closed login popup');
-                    } else if (err.code === 'auth/cancelled-popup-request') {
-                        // Multiple popup requests, ignore
-                        console.log('Popup request cancelled');
-                    } else if (err.code === 'auth/network-request-failed') {
-                        setAuthError('Network error. Please check your internet connection.');
-                    } else if (err.code === 'auth/unauthorized-domain') {
-                        setAuthError('This domain is not authorized. Please contact support.');
+                    } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+                        // User cancelled - no error message needed
+                        console.log('User cancelled login');
+                    } else if (err.code === 'auth/operation-not-supported-in-this-environment') {
+                        // Environment doesn't support popup - use redirect
+                        console.log('Environment issue, trying redirect...');
+                        try {
+                            setIsLoggingIn(true);
+                            await signInWithRedirect(auth, provider);
+                        } catch (redirectErr) {
+                            setIsLoggingIn(false);
+                            setAuthError('Login not supported in this browser. Please try Chrome or Safari.');
+                        }
                     } else {
-                        setAuthError(err.message || 'Login failed. Please try again.');
+                        // Show user-friendly error message
+                        const errorMsg = getAuthErrorMessage(err.code);
+                        if (errorMsg) {
+                            setAuthError(errorMsg);
+                        }
                     }
                 }
             };
@@ -9290,7 +9363,7 @@ Respond with ONLY the JSON object, nothing else.`
             if (!user) return (
                 <>
                     <div className="fixed inset-0 z-[-1] bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-300 via-purple-300 to-orange-200"></div>
-                    <LoginPage onLogin={handleLogin} error={authError} />
+                    <LoginPage onLogin={handleLogin} error={authError} isLoggingIn={isLoggingIn} />
                 </>
             );
 
