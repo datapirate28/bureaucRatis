@@ -8220,7 +8220,33 @@ Respond with ONLY the JSON object, nothing else.`
             };
 
             const handleAdd = async (data) => { if (user) await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), data); };
-            const handleDelete = async (id) => { if (user) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id)); };
+            const handleDelete = async (id) => {
+                if (!user) return;
+                try {
+                    // Get the item first to check if it was adopted from cemetery
+                    const itemRef = doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id);
+                    const itemSnap = await getDoc(itemRef);
+
+                    if (itemSnap.exists()) {
+                        const itemData = itemSnap.data();
+
+                        // If this was an adopted word, decrement the cemetery's adoptionCount
+                        if (itemData.adoptedFrom?.cemeteryId) {
+                            const cemeteryRef = doc(db, 'artifacts', appId, 'cemetery', itemData.adoptedFrom.cemeteryId);
+                            await updateDoc(cemeteryRef, {
+                                adoptionCount: increment(-1)
+                            }).catch(() => {
+                                // Cemetery item might have been deleted, that's okay
+                            });
+                        }
+                    }
+
+                    // Delete the vocabulary item
+                    await deleteDoc(itemRef);
+                } catch (err) {
+                    console.error('Error deleting vocabulary item:', err);
+                }
+            };
 
             // Accept share request - add items to user's vocabulary
             const handleAcceptShare = async (request) => {
