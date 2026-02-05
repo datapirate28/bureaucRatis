@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix mobile browser compatibility and auto-sync users to admin panel\n\n- Add es-module-shims polyfill for Safari/older browser support\n- Fix Firebase Auth to use redirect on mobile instead of popup\n- Add loading screen and error handling\n- Fix service worker paths\n- Add vercel.json with proper headers\n- Auto-save users to chatUsers on login \\(fixes admin panel\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)"
+    ]
+  }
+}
