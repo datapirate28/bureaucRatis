@@ -9129,72 +9129,87 @@ Respond with ONLY the JSON object, nothing else.`
                 const isFirefox = /Firefox/i.test(ua);
                 const isBrave = navigator.brave !== undefined;
                 const isEdge = /Edge|Edg/i.test(ua);
-                const isInAppBrowser = /FBAN|FBAV|Instagram|Twitter|Line/i.test(ua);
+                const isInAppBrowser = /FBAN|FBAV|Instagram|Twitter|Line|WhatsApp|Snapchat/i.test(ua);
                 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+                const isSamsungBrowser = /SamsungBrowser/i.test(ua);
+                const isWebView = /(wv|WebView)/i.test(ua);
 
-                return { isIOS, isAndroid, isMobile, isSafari, isChrome, isFirefox, isBrave, isEdge, isInAppBrowser, isStandalone };
+                return { isIOS, isAndroid, isMobile, isSafari, isChrome, isFirefox, isBrave, isEdge, isInAppBrowser, isStandalone, isSamsungBrowser, isWebView };
             };
 
-            // Handle redirect result on page load
+            // Handle redirect result on page load (only process if coming back from redirect)
             useEffect(() => {
-                setIsLoggingIn(true);
-                getRedirectResult(auth).then(async (result) => {
-                    setIsLoggingIn(false);
-                    if (result?.user) {
-                        const u = result.user;
-                        setUser(u);
-                        setLoading(false);
-                        setAuthError(null);
-                        // Sync user to chatUsers (for admin panel)
-                        try {
-                            await setDoc(doc(db, 'artifacts', appId, 'chatUsers', u.uid), {
-                                uid: u.uid,
-                                displayName: u.displayName || 'Anonymous',
-                                photoURL: u.photoURL || '',
-                                email: u.email || '',
-                                lastSeen: Date.now(),
-                                createdAt: Date.now()
-                            }, { merge: true });
-                        } catch (err) {
-                            console.log('Could not sync user to chatUsers:', err);
+                // Check if we're returning from a redirect
+                const handleRedirectResult = async () => {
+                    try {
+                        const result = await getRedirectResult(auth);
+                        if (result?.user) {
+                            setIsLoggingIn(false);
+                            const u = result.user;
+                            setUser(u);
+                            setLoading(false);
+                            setAuthError(null);
+                            // Sync user to chatUsers (for admin panel)
+                            try {
+                                await setDoc(doc(db, 'artifacts', appId, 'chatUsers', u.uid), {
+                                    uid: u.uid,
+                                    displayName: u.displayName || 'Anonymous',
+                                    photoURL: u.photoURL || '',
+                                    email: u.email || '',
+                                    lastSeen: Date.now(),
+                                    createdAt: Date.now()
+                                }, { merge: true });
+                            } catch (err) {
+                                console.log('Could not sync user to chatUsers:', err);
+                            }
+                        }
+                    } catch (error) {
+                        setIsLoggingIn(false);
+                        console.error('Redirect auth error:', error);
+                        if (error.code && !['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(error.code)) {
+                            setAuthError(getAuthErrorMessage(error.code));
                         }
                     }
-                }).catch((error) => {
-                    setIsLoggingIn(false);
-                    console.error('Redirect auth error:', error);
-                    // Only show error for actual failures, not user cancellations
-                    if (error.code && !['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(error.code)) {
-                        setAuthError(getAuthErrorMessage(error.code));
-                    }
-                    setLoading(false);
-                });
+                };
+                handleRedirectResult();
             }, []);
 
             // Convert Firebase auth error codes to user-friendly messages
             const getAuthErrorMessage = (errorCode) => {
                 const errorMessages = {
-                    'auth/popup-blocked': 'Popup was blocked. Please allow popups for this site and try again.',
-                    'auth/popup-closed-by-user': null, // Don't show error
-                    'auth/cancelled-popup-request': null, // Don't show error
-                    'auth/network-request-failed': 'Network error. Please check your internet connection and try again.',
-                    'auth/unauthorized-domain': 'This domain is not authorized for sign-in. Please contact support.',
-                    'auth/operation-not-allowed': 'Google sign-in is not enabled. Please contact support.',
+                    'auth/popup-blocked': 'Popup was blocked. Trying alternative method...',
+                    'auth/popup-closed-by-user': null,
+                    'auth/cancelled-popup-request': null,
+                    'auth/network-request-failed': 'Network error. Please check your internet connection.',
+                    'auth/unauthorized-domain': 'Authentication error. Please try again or contact support.',
+                    'auth/operation-not-allowed': 'Google sign-in is temporarily unavailable. Please try again.',
                     'auth/user-disabled': 'This account has been disabled. Please contact support.',
-                    'auth/internal-error': 'An internal error occurred. Please try again.',
+                    'auth/internal-error': 'An error occurred. Please try again.',
                     'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
-                    'auth/web-storage-unsupported': 'Please enable cookies and try again.',
+                    'auth/web-storage-unsupported': 'Please enable cookies in your browser settings.',
                     'auth/invalid-credential': 'Invalid credentials. Please try again.',
+                    'auth/account-exists-with-different-credential': 'An account already exists with this email.',
+                    'auth/credential-already-in-use': 'This credential is already associated with another account.',
                 };
                 return errorMessages[errorCode] || 'Sign-in failed. Please try again.';
             };
 
+            // Attempt popup auth with automatic redirect fallback
+            const tryPopupAuth = async (provider) => {
+                try {
+                    const result = await signInWithPopup(auth, provider);
+                    return { success: true, result };
+                } catch (err) {
+                    return { success: false, error: err };
+                }
+            };
+
             const handleLogin = async () => {
                 if (window.location.protocol === 'file:') {
-                    showToast("Google Login requires a server. Please use the 'Live Server' extension in VS Code.", 'warning');
+                    showToast("Google Login requires a server.", 'warning');
                     return;
                 }
 
-                // Prevent double-clicks
                 if (isLoggingIn) return;
 
                 setIsLoggingIn(true);
@@ -9202,70 +9217,77 @@ Respond with ONLY the JSON object, nothing else.`
 
                 const provider = new GoogleAuthProvider();
                 provider.setCustomParameters({ prompt: 'select_account' });
+                // Add scopes for better compatibility
+                provider.addScope('email');
+                provider.addScope('profile');
 
                 const browser = getBrowserInfo();
                 console.log('Browser info:', browser);
 
+                // Determine if we MUST use redirect (environments where popup never works)
+                const mustUseRedirect = browser.isInAppBrowser ||
+                                        browser.isWebView ||
+                                        browser.isStandalone;
+
                 try {
-                    // Decision tree for auth method:
-                    // 1. In-app browsers (Facebook, Instagram, etc.): Use redirect (popups don't work)
-                    // 2. Standalone PWA: Use redirect (popups may not work)
-                    // 3. Android Chrome/Firefox: Use redirect (more reliable)
-                    // 4. iOS Safari: Use popup (redirect fails due to ITP)
-                    // 5. iOS Chrome: Use popup (same as Safari due to WebKit)
-                    // 6. Desktop browsers: Use popup (better UX)
-                    // 7. Brave: Use popup (handles it well)
-
-                    const useRedirect = browser.isInAppBrowser ||
-                                       browser.isStandalone ||
-                                       (browser.isAndroid && !browser.isBrave);
-
-                    if (useRedirect) {
-                        console.log('Using redirect auth');
+                    if (mustUseRedirect) {
+                        // In-app browsers, WebViews, PWA - redirect is the only option
+                        console.log('Using redirect (required for this environment)');
                         await signInWithRedirect(auth, provider);
-                        // Note: This will redirect away from the page, no code after this runs
-                    } else {
-                        console.log('Using popup auth');
-                        const result = await signInWithPopup(auth, provider);
-                        setIsLoggingIn(false);
-                        // User is signed in, onAuthStateChanged will handle the rest
-                        if (result?.user) {
-                            setAuthError(null);
-                        }
+                        return;
                     }
+
+                    // For all other cases: Try popup first, fall back to redirect if needed
+                    console.log('Attempting popup auth...');
+                    const popupResult = await tryPopupAuth(provider);
+
+                    if (popupResult.success) {
+                        console.log('Popup auth successful');
+                        setIsLoggingIn(false);
+                        setAuthError(null);
+                        return;
+                    }
+
+                    // Popup failed - analyze error and decide next step
+                    const err = popupResult.error;
+                    console.log('Popup failed:', err.code, err.message);
+
+                    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+                        // User intentionally closed - don't retry or show error
+                        setIsLoggingIn(false);
+                        return;
+                    }
+
+                    if (err.code === 'auth/popup-blocked' ||
+                        err.code === 'auth/operation-not-supported-in-this-environment' ||
+                        err.code === 'auth/unauthorized-domain') {
+                        // Try redirect as fallback
+                        console.log('Falling back to redirect auth...');
+                        showToast('Opening sign-in page...', 'info');
+                        await signInWithRedirect(auth, provider);
+                        return;
+                    }
+
+                    // For other errors, show message
+                    setIsLoggingIn(false);
+                    const errorMsg = getAuthErrorMessage(err.code);
+                    if (errorMsg) {
+                        setAuthError(errorMsg);
+                    }
+
                 } catch (err) {
-                    console.error('Login error:', err.code, err.message);
+                    console.error('Login error:', err);
                     setIsLoggingIn(false);
 
-                    // Handle specific error cases with fallback strategies
-                    if (err.code === 'auth/popup-blocked') {
-                        // Popup blocked - try redirect as fallback
-                        console.log('Popup blocked, trying redirect...');
+                    // Last resort: try redirect if anything unexpected happens
+                    if (err.code !== 'auth/popup-closed-by-user') {
                         try {
+                            console.log('Unexpected error, trying redirect...');
                             setIsLoggingIn(true);
                             await signInWithRedirect(auth, provider);
                         } catch (redirectErr) {
                             setIsLoggingIn(false);
-                            setAuthError('Login failed. Please enable popups or try a different browser.');
-                        }
-                    } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-                        // User cancelled - no error message needed
-                        console.log('User cancelled login');
-                    } else if (err.code === 'auth/operation-not-supported-in-this-environment') {
-                        // Environment doesn't support popup - use redirect
-                        console.log('Environment issue, trying redirect...');
-                        try {
-                            setIsLoggingIn(true);
-                            await signInWithRedirect(auth, provider);
-                        } catch (redirectErr) {
-                            setIsLoggingIn(false);
-                            setAuthError('Login not supported in this browser. Please try Chrome or Safari.');
-                        }
-                    } else {
-                        // Show user-friendly error message
-                        const errorMsg = getAuthErrorMessage(err.code);
-                        if (errorMsg) {
-                            setAuthError(errorMsg);
+                            setAuthError('Unable to sign in. Please try a different browser or check your internet connection.');
                         }
                     }
                 }
