@@ -7276,6 +7276,7 @@ Respond with ONLY the JSON object, nothing else.`
             const [isLoading, setIsLoading] = useState(true);
             const [filter, setFilter] = useState('all');
             const [adoptingId, setAdoptingId] = useState(null);
+            const [deletingId, setDeletingId] = useState(null);
 
             // Load cemetery items
             useEffect(() => {
@@ -7344,6 +7345,28 @@ Respond with ONLY the JSON object, nothing else.`
                     console.error('Error adopting word:', err);
                 }
                 setAdoptingId(null);
+            };
+
+            // Delete item from cemetery (only if user is owner and no one adopted it)
+            const handleDeleteFromCemetery = async (item) => {
+                if (!user || deletingId) return;
+                if (item.abandonedBy?.uid !== user.uid) return;
+                if ((item.adoptionCount || 0) > 0) return;
+
+                setDeletingId(item.id);
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'cemetery', item.id));
+                    showToast(`"${item.mainText}" removed from Lost & Found`, 'success');
+                } catch (err) {
+                    console.error('Error deleting from cemetery:', err);
+                    showToast('Failed to delete word', 'error');
+                }
+                setDeletingId(null);
+            };
+
+            // Check if current user can delete this item
+            const canDelete = (item) => {
+                return user && item.abandonedBy?.uid === user.uid && (item.adoptionCount || 0) === 0;
             };
 
             return (
@@ -7453,19 +7476,37 @@ Respond with ONLY the JSON object, nothing else.`
                                                     </div>
                                                 </div>
 
-                                                {/* Adopt Button */}
-                                                <button
-                                                    onClick={() => handleAdopt(item)}
-                                                    disabled={adoptingId === item.id}
-                                                    className="shrink-0 px-4 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                                >
-                                                    {adoptingId === item.id ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                                    ) : (
-                                                        <HeartHandshake className="w-4 h-4" />
+                                                {/* Action Buttons */}
+                                                <div className="shrink-0 flex flex-col gap-2">
+                                                    {/* Delete Button - only for owner when no adoptions */}
+                                                    {canDelete(item) && (
+                                                        <button
+                                                            onClick={() => handleDeleteFromCemetery(item)}
+                                                            disabled={deletingId === item.id}
+                                                            className={`px-4 py-2 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${theme === 'dark' ? 'bg-rose-500/20 text-rose-400 hover:bg-rose-500/30' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`}
+                                                        >
+                                                            {deletingId === item.id ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : (
+                                                                <Trash2 className="w-4 h-4" />
+                                                            )}
+                                                            Delete
+                                                        </button>
                                                     )}
-                                                    Adopt
-                                                </button>
+                                                    {/* Adopt Button */}
+                                                    <button
+                                                        onClick={() => handleAdopt(item)}
+                                                        disabled={adoptingId === item.id}
+                                                        className="px-4 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                    >
+                                                        {adoptingId === item.id ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        ) : (
+                                                            <HeartHandshake className="w-4 h-4" />
+                                                        )}
+                                                        Adopt
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
