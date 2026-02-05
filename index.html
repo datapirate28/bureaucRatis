@@ -1242,7 +1242,7 @@
 
                     {/* VIEW: MENU */}
                     {view === 'menu' && (
-                        <div className="flex-1 relative z-10 flex flex-col items-center justify-center p-6 space-y-16 animate-in zoom-in-95 duration-700">
+                        <div className="flex-1 relative z-10 flex flex-col items-center justify-center p-6 space-y-8 sm:space-y-16 animate-in zoom-in-95 duration-700">
                             {/* Hero Title */}
                             <div className="text-center space-y-6 relative">
                                 <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none"></div>
@@ -1313,7 +1313,7 @@
                                 <div className="absolute inset-0 bg-indigo-500/20 blur-[30px] rounded-full group-hover:bg-indigo-500/30 transition-colors"></div>
                                 <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 sm:p-12 text-center transition-transform group-hover:scale-105 group-active:scale-95">
                                     <div className="text-xs font-black uppercase tracking-[0.3em] text-indigo-300 mb-4 opacity-70">Room Code</div>
-                                    <div className="text-6xl sm:text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-white/50 shadow-2xl">
+                                    <div className="text-5xl sm:text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-white/50 shadow-2xl">
                                         {gameId}
                                     </div>
                                 </div>
@@ -1353,7 +1353,7 @@
 
                     {/* VIEW: GAME */}
                     {view === 'game' && questions[currentQIndex] && (
-                        <div className="flex-1 relative z-10 flex flex-col p-4 sm:p-6 max-w-4xl mx-auto w-full">
+                        <div className="flex-1 relative z-10 flex flex-col p-4 sm:p-6 pb-32 max-w-4xl mx-auto w-full">
                             {/* Game Header */}
                             {/* Progress & Score Tabs */}
                             <div className="flex justify-between items-center mb-6 sm:mb-10 px-2">
@@ -1372,14 +1372,14 @@
                             <div className="flex-1 flex flex-col justify-center mb-8">
                                 <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden group">
                                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
-                                    <h2 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight text-center drop-shadow-md">
+                                    <h2 className="text-2xl sm:text-5xl font-black leading-tight tracking-tight text-center drop-shadow-md">
                                         {questions[currentQIndex].text}
                                     </h2>
                                 </div>
                             </div>
 
                             {/* Options */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5 pb-20 sm:pb-8">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5 pb-32 sm:pb-8">
                                 {questions[currentQIndex].options.map((opt, idx) => {
                                     let btnStateClass = 'bg-white/5 hover:bg-white/10 border-white/10 text-white'; // Default
 
@@ -1452,7 +1452,7 @@
                                 <p className="relative font-bold text-white/40 uppercase tracking-[0.3em] text-sm">Or Defeat...</p>
                             </div>
 
-                            <div className="flex-1 w-full max-w-2xl mx-auto space-y-3 overflow-y-auto pb-24 custom-scrollbar">
+                            <div className="flex-1 w-full max-w-2xl mx-auto space-y-3 overflow-y-auto pb-32 custom-scrollbar">
                                 {players.sort((a, b) => b.score - a.score).map((p, i) => (
                                     <div key={p.uid} className={`relative group p-4 sm:p-6 rounded-3xl border transition-all duration-500 ${p.uid === user.uid ? 'bg-white/10 border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.15)] z-10 scale-[1.02]' : 'bg-black/20 border-white/5 hover:bg-white/5'}`}>
                                         <div className="flex items-center gap-6 relative z-10">
