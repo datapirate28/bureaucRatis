@@ -410,7 +410,8 @@
             Book, Mic, Volume2, Wand2, Star, ChevronRight, Activity, Grid, List,
             Moon, Sun, Upload, Pencil, Send, Users, MessageSquare, Circle, Heart, UserPlus, UserMinus, UserCheck,
             CheckCheck, Image as ImageIcon, MessagesSquare, Share2, Inbox, Gift, Package, FileText, ExternalLink, Eye,
-            Shield, Ban, Mail, AlertCircle, RefreshCw, Copy
+            Shield, Ban, Mail, AlertCircle, RefreshCw, Copy,
+            Archive, Flag, HeartHandshake
         } from 'lucide-react';
 
         // Import Firebase
@@ -440,7 +441,8 @@
             serverTimestamp,
             orderBy,
             where,
-            limit
+            limit,
+            increment
         } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
         // --- FIREBASE SETUP ---
@@ -515,7 +517,7 @@
 
         // --- COMPONENTS ---
 
-        const ItemCard = ({ title, subtitle, icon: Icon, colorClass, onDelete, onSpeak, onEdit, onShare, interval, type, theme, sharedBy }) => {
+        const ItemCard = ({ title, subtitle, icon: Icon, colorClass, onDelete, onSpeak, onEdit, onShare, onGiveUp, interval, type, theme, sharedBy, failureCount, adoptedFrom }) => {
             const gradients = {
                 voca: "from-indigo-500 to-blue-500",
                 synonym: "from-violet-500 to-purple-500",
@@ -541,6 +543,11 @@
                         {sharedBy && (
                             <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-800 flex items-center justify-center" title={`Shared by ${sharedBy.displayName}`}>
                                 <Share2 className="w-3 h-3 text-white" />
+                            </div>
+                        )}
+                        {adoptedFrom && (
+                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500 border-2 border-white dark:border-slate-800 flex items-center justify-center" title={`Rescued from ${adoptedFrom.originalOwner?.displayName || 'Lost & Found'}`}>
+                                <HeartHandshake className="w-3 h-3 text-white" />
                             </div>
                         )}
                     </div>
@@ -571,6 +578,11 @@
                         {onShare && (
                             <button onClick={onShare} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-500 hover:text-emerald-600'}`} title="Share to Peers">
                                 <Share2 className="w-5 h-5" />
+                            </button>
+                        )}
+                        {onGiveUp && !sharedBy && (
+                            <button onClick={onGiveUp} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300' : 'bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600'}`} title="Let it go to Lost & Found">
+                                <Flag className="w-5 h-5" />
                             </button>
                         )}
                         {onEdit && (
@@ -675,7 +687,7 @@
             </div>
         );
 
-        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages, setIsShareModalOpen, setIsSharingInboxOpen, shareRequestCount, setIsProfileModalOpen }) => {
+        const Navigation = ({ activeTab, setActiveTab, user, onLogout, items, streak, theme, toggleTheme, setIsMessengerOpen, totalUnreadMessages, setIsShareModalOpen, setIsSharingInboxOpen, shareRequestCount, setIsProfileModalOpen, setIsCemeteryOpen }) => {
             // Build nav items - include Admin tab only for admin user
             const navItems = [
                 { id: 'dashboard', label: 'Dashboard', icon: Grid },
@@ -728,6 +740,12 @@
             // Handle inbox button click
             const handleInboxClick = () => {
                 setIsSharingInboxOpen(true);
+                setIconsExpanded(false);
+            };
+
+            // Handle cemetery button click
+            const handleCemeteryClick = () => {
+                setIsCemeteryOpen(true);
                 setIconsExpanded(false);
             };
 
@@ -857,6 +875,18 @@
                                             {shareRequestCount > 99 ? '99+' : shareRequestCount}
                                         </span>
                                     )}
+                                </button>
+
+                                {/* Lost & Found / Cemetery Button */}
+                                <button
+                                    onClick={handleCemeteryClick}
+                                    className={`relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl shadow-md transition-all duration-200 ease-out hover:scale-110 hover:shadow-lg active:scale-95 ${theme === 'dark'
+                                        ? 'bg-gradient-to-br from-slate-600 to-slate-700 border border-white/10'
+                                        : 'bg-gradient-to-br from-slate-500 to-slate-600'
+                                        }`}
+                                    title="Lost & Found"
+                                >
+                                    <Archive className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] text-white" />
                                 </button>
                             </div>
 
@@ -1688,7 +1718,7 @@
             );
         };
 
-        const VocaManager = ({ items, onAdd, onDelete, onDeleteAll, onUpdate, theme }) => {
+        const VocaManager = ({ items, onAdd, onDelete, onDeleteAll, onUpdate, theme, onGiveUp }) => {
             const [formData, setFormData] = useState({ word: '', pos: 'noun', ipa: '', definition: '', example: '', collocations: '' });
             const [isFetchingIPA, setIsFetchingIPA] = useState(false);
             const [isFetchingExample, setIsFetchingExample] = useState(false);
@@ -2003,7 +2033,7 @@ Respond with ONLY the JSON object, nothing else.`
                         </div>
                     }>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
-                            {vocaItems.map(item => (<ItemCard key={item.id} type="voca" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-indigo-500 uppercase text-[10px] tracking-wider mr-2 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.pos}</span>{item.context || "No definition"}</span>} icon={Book} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} interval={item.interval} sharedBy={item.sharedBy} />))}
+                            {vocaItems.map(item => (<ItemCard key={item.id} type="voca" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-indigo-500 uppercase text-[10px] tracking-wider mr-2 bg-indigo-500/10 px-1.5 py-0.5 rounded">{item.pos}</span>{item.context || "No definition"}</span>} icon={Book} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} onGiveUp={onGiveUp ? () => onGiveUp(item) : undefined} interval={item.interval} sharedBy={item.sharedBy} failureCount={item.failureCount || 0} adoptedFrom={item.adoptedFrom} />))}
                         </div>
                     </ManagerContainer>
 
@@ -2555,14 +2585,14 @@ Respond with ONLY the JSON object, nothing else.`
                             )}
                         </div>
                     }>
-                        <div className="grid grid-cols-1 gap-5">{phraseItems.map(item => (<ItemCard key={item.id} type="phrase" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>} icon={MessageCircle} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} interval={item.interval} sharedBy={item.sharedBy} />))}</div>
+                        <div className="grid grid-cols-1 gap-5">{phraseItems.map(item => (<ItemCard key={item.id} type="phrase" title={item.mainText} theme={theme} subtitle={<span><span className="font-bold text-amber-500 uppercase text-[10px] tracking-wider mr-2 bg-amber-500/10 px-1.5 py-0.5 rounded">{item.context || "General"}</span></span>} icon={MessageCircle} onDelete={() => onDelete(item.id)} onEdit={() => openEditModal(item)} onGiveUp={onGiveUp ? () => onGiveUp(item) : undefined} interval={item.interval} sharedBy={item.sharedBy} failureCount={item.failureCount || 0} adoptedFrom={item.adoptedFrom} />))}</div>
                     </ManagerContainer>
                 </div>
             );
         };
 
         // --- MY LEARNING - UNIFIED COMPONENT ---
-        const MyLearning = ({ items, onAdd, onDelete, onDeleteAll, onUpdate, theme, user, onShareToPeers }) => {
+        const MyLearning = ({ items, onAdd, onDelete, onDeleteAll, onUpdate, theme, user, onShareToPeers, onGiveUp }) => {
             const [activeCategory, setActiveCategory] = useState('voca');
 
             // Edit modal states
@@ -2920,8 +2950,11 @@ Respond with ONLY the JSON object, nothing else.`
                                             onEdit={() => openEditModal(item)}
                                             onShare={activeCategory !== 'shared' ? () => handleShareToPeers(item) : undefined}
                                             onDelete={() => handleDeleteClick(item)}
+                                            onGiveUp={onGiveUp ? () => onGiveUp(item) : undefined}
                                             interval={item.interval}
                                             sharedBy={item.sharedBy}
+                                            failureCount={item.failureCount || 0}
+                                            adoptedFrom={item.adoptedFrom}
                                         />
                                     );
                                 })}
@@ -4049,9 +4082,10 @@ Respond with ONLY the JSON object, nothing else.`
             );
         };
 
-        const ReviewSession = ({ dueItems, onClose, onComplete, mode = 'srs', theme }) => {
+        const ReviewSession = ({ dueItems, onClose, onComplete, mode = 'srs', theme, onSuggestGiveUp }) => {
             const [localIndex, setLocalIndex] = useState(0);
             const [isFlipped, setIsFlipped] = useState(false);
+            const [showGiveUpPrompt, setShowGiveUpPrompt] = useState(false);
 
             const currentItem = mode === 'srs' ? dueItems[0] : dueItems[localIndex];
             const totalDue = dueItems.length;
@@ -4085,8 +4119,19 @@ Respond with ONLY the JSON object, nothing else.`
             const handleSRSRate = (rating) => {
                 const { interval, easiness } = calculateNextReview(rating, currentItem.interval || 0, currentItem.easiness || 2.5);
                 const nextReviewDate = Date.now() + (interval * 24 * 60 * 60 * 1000);
-                onComplete(currentItem.id, { interval, easiness, nextReview: nextReviewDate });
-                setIsFlipped(false);
+
+                // Track failure count for Give Up feature
+                const previousFailures = currentItem.failureCount || 0;
+                const newFailureCount = rating < 3 ? previousFailures + 1 : 0;
+
+                onComplete(currentItem.id, { interval, easiness, nextReview: nextReviewDate, failureCount: newFailureCount });
+
+                // Suggest giving up after 3 consecutive failures
+                if (rating < 3 && newFailureCount >= 3 && onSuggestGiveUp) {
+                    setShowGiveUpPrompt(true);
+                } else {
+                    setIsFlipped(false);
+                }
             };
 
             const handleFlashcardNext = () => { setLocalIndex(prev => prev + 1); setIsFlipped(false); };
@@ -4094,6 +4139,51 @@ Respond with ONLY the JSON object, nothing else.`
 
             const cardBg = theme === 'dark' ? 'bg-slate-800' : 'bg-white';
             const textColor = theme === 'dark' ? 'text-white' : 'text-slate-800';
+
+            // Handle Give Up prompt responses
+            const handleGiveUpYes = () => {
+                setShowGiveUpPrompt(false);
+                if (onSuggestGiveUp) onSuggestGiveUp(currentItem);
+            };
+            const handleGiveUpNo = () => {
+                setShowGiveUpPrompt(false);
+                setIsFlipped(false);
+            };
+
+            // Give Up suggestion prompt overlay
+            if (showGiveUpPrompt && currentItem) {
+                return (
+                    <div className="fixed inset-0 bg-slate-900/95 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+                        <div className={`${cardBg} rounded-3xl shadow-2xl max-w-md w-full p-8 text-center animate-in zoom-in-95 duration-300`}>
+                            <div className={`w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                                <Flag className={`w-10 h-10 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-500'}`} />
+                            </div>
+                            <h3 className={`text-2xl font-black mb-3 ${textColor}`}>Struggling with this one?</h3>
+                            <p className={`mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                You've had trouble with "<span className="font-semibold">{currentItem.mainText}</span>" multiple times.
+                            </p>
+                            <p className={`mb-8 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                                Let it go to the Lost & Found where someone else might rescue it. Your struggle helps others learn!
+                            </p>
+                            <div className="flex gap-3 justify-center">
+                                <button
+                                    onClick={handleGiveUpNo}
+                                    className={`px-6 py-3 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                >
+                                    Keep Trying
+                                </button>
+                                <button
+                                    onClick={handleGiveUpYes}
+                                    className="px-6 py-3 rounded-2xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/25 flex items-center gap-2"
+                                >
+                                    <Flag className="w-4 h-4" />
+                                    Let It Go
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="fixed inset-0 bg-slate-900/95 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
@@ -4182,6 +4272,45 @@ Respond with ONLY the JSON object, nothing else.`
                                 >
                                     <Trash2 className="w-4 h-4" />
                                     {confirmText}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Give Up Confirmation Modal Component
+        const GiveUpConfirmModal = ({ item, onClose, onConfirm, theme }) => {
+            if (!item) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[260] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+                    <div className={`${theme === 'dark' ? 'bg-slate-800/95 border-slate-700' : 'bg-white/95 border-slate-200'} p-8 rounded-3xl max-w-md w-full shadow-2xl border backdrop-blur-xl animate-in zoom-in-95 duration-300`} onClick={e => e.stopPropagation()}>
+                        <div className="text-center">
+                            <div className={`w-16 h-16 mx-auto mb-5 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                                <Flag className={`w-8 h-8 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-500'}`} />
+                            </div>
+                            <h3 className={`text-2xl font-black mb-3 ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>Let this word go?</h3>
+                            <p className={`mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                "<span className="font-semibold">{item.mainText}</span>" will be sent to the Lost & Found.
+                            </p>
+                            <p className={`mb-8 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                                Other learners can adopt it and try to master it. Your struggle helps the community!
+                            </p>
+                            <div className="flex gap-3 justify-center">
+                                <button
+                                    onClick={onClose}
+                                    className={`px-6 py-3 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 ${theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                >
+                                    Keep It
+                                </button>
+                                <button
+                                    onClick={() => onConfirm(item)}
+                                    className="px-6 py-3 rounded-2xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/25 flex items-center gap-2"
+                                >
+                                    <Flag className="w-4 h-4" />
+                                    Let It Go
                                 </button>
                             </div>
                         </div>
@@ -5939,6 +6068,7 @@ Respond with ONLY the JSON object, nothing else.`
             });
             const [isSaving, setIsSaving] = useState(false);
             const [profileData, setProfileData] = useState(null);
+            const [userStats, setUserStats] = useState(null);
             const [isLoading, setIsLoading] = useState(true);
 
             // Calculate statistics from items
@@ -5991,6 +6121,12 @@ Respond with ONLY the JSON object, nothing else.`
                                 bio: '',
                                 location: ''
                             });
+                        }
+
+                        // Load user stats for badges
+                        const statsDoc = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'metadata', 'stats'));
+                        if (statsDoc.exists()) {
+                            setUserStats(statsDoc.data());
                         }
                     } catch (err) {
                         console.error('Error loading profile:', err);
@@ -6211,6 +6347,54 @@ Respond with ONLY the JSON object, nothing else.`
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Badges Section */}
+                                    {userStats?.badges?.rescuer?.earned && (
+                                        <div className="mb-6">
+                                            <h4 className={`font-bold ${textMain} mb-4 flex items-center gap-2`}>
+                                                <Trophy className="w-5 h-5 text-amber-500" />
+                                                Badges
+                                            </h4>
+                                            <div className={`${cardBg} rounded-xl p-4 flex items-center gap-4`}>
+                                                <div className={`w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br ${
+                                                    userStats.badges.rescuer.tier === 'platinum' ? 'from-purple-400 to-indigo-500' :
+                                                    userStats.badges.rescuer.tier === 'gold' ? 'from-yellow-400 to-amber-500' :
+                                                    userStats.badges.rescuer.tier === 'silver' ? 'from-slate-300 to-slate-400' :
+                                                    'from-amber-600 to-orange-600'
+                                                }`}>
+                                                    <HeartHandshake className="w-7 h-7 text-white" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className={`font-bold ${textMain}`}>
+                                                        {userStats.badges.rescuer.tier.charAt(0).toUpperCase() + userStats.badges.rescuer.tier.slice(1)} Rescuer
+                                                    </div>
+                                                    <div className={`text-sm ${textSub}`}>
+                                                        {userStats.badges.rescuer.rescueCount} word{userStats.badges.rescuer.rescueCount !== 1 ? 's' : ''} rescued from Lost & Found
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Community Stats */}
+                                    {(userStats?.wordsAbandoned > 0 || userStats?.wordsAdopted > 0) && (
+                                        <div className="mb-6">
+                                            <h4 className={`font-bold ${textMain} mb-4 flex items-center gap-2`}>
+                                                <Archive className="w-5 h-5 text-slate-500" />
+                                                Lost & Found Activity
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                    <div className={`text-2xl font-black ${textMain}`}>{userStats?.wordsAbandoned || 0}</div>
+                                                    <div className={`text-xs font-bold ${textSub} uppercase`}>Released</div>
+                                                </div>
+                                                <div className={`${cardBg} rounded-xl p-4 text-center`}>
+                                                    <div className="text-2xl font-black text-amber-500">{userStats?.wordsAdopted || 0}</div>
+                                                    <div className={`text-xs font-bold ${textSub} uppercase`}>Adopted</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -6254,6 +6438,7 @@ Respond with ONLY the JSON object, nothing else.`
         const UserPublicProfile = ({ isOpen, onClose, targetUser, theme, currentUser, showToast }) => {
             const [profileData, setProfileData] = useState(null);
             const [userItems, setUserItems] = useState([]);
+            const [userStats, setUserStats] = useState(null);
             const [isLoading, setIsLoading] = useState(true);
             const [activeCategory, setActiveCategory] = useState('all');
             const [error, setError] = useState(null);
@@ -6316,6 +6501,12 @@ Respond with ONLY the JSON object, nothing else.`
                         const vocabSnapshot = await getDocs(vocabQuery);
                         const items = vocabSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setUserItems(items);
+
+                        // Load user stats for badges
+                        const statsDoc = await getDoc(doc(db, 'artifacts', appId, 'users', targetUser.uid || targetUser.id, 'metadata', 'stats'));
+                        if (statsDoc.exists()) {
+                            setUserStats(statsDoc.data());
+                        }
                     } catch (err) {
                         console.error('Error loading user data:', err);
                         setError('Could not load user profile');
@@ -6421,6 +6612,27 @@ Respond with ONLY the JSON object, nothing else.`
                                 <div className="text-xl font-black text-emerald-500">{stats.mastered}</div>
                                 <div className={`text-xs ${textSub}`}>Mastered</div>
                             </div>
+                            {/* Rescuer Badge */}
+                            {userStats?.badges?.rescuer?.earned && (
+                                <div className="ml-auto flex items-center gap-2">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br ${
+                                        userStats.badges.rescuer.tier === 'platinum' ? 'from-purple-400 to-indigo-500' :
+                                        userStats.badges.rescuer.tier === 'gold' ? 'from-yellow-400 to-amber-500' :
+                                        userStats.badges.rescuer.tier === 'silver' ? 'from-slate-300 to-slate-400' :
+                                        'from-amber-600 to-orange-600'
+                                    }`}>
+                                        <HeartHandshake className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div>
+                                        <div className={`text-sm font-bold ${textMain}`}>
+                                            {userStats.badges.rescuer.tier.charAt(0).toUpperCase() + userStats.badges.rescuer.tier.slice(1)} Rescuer
+                                        </div>
+                                        <div className={`text-xs ${textSub}`}>
+                                            {userStats.badges.rescuer.rescueCount} rescued
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Category Tabs */}
@@ -7058,6 +7270,220 @@ Respond with ONLY the JSON object, nothing else.`
             );
         };
 
+        // Cemetery Browser - Browse and adopt abandoned words
+        const CemeteryBrowser = ({ isOpen, onClose, user, theme, onAdopt, showToast }) => {
+            const [cemeteryItems, setCemeteryItems] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
+            const [filter, setFilter] = useState('all');
+            const [adoptingId, setAdoptingId] = useState(null);
+
+            // Load cemetery items
+            useEffect(() => {
+                if (!isOpen) return;
+                setIsLoading(true);
+                const q = query(
+                    collection(db, 'artifacts', appId, 'cemetery'),
+                    orderBy('abandonedAt', 'desc'),
+                    limit(100)
+                );
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setCemeteryItems(items);
+                    setIsLoading(false);
+                });
+                return () => unsubscribe();
+            }, [isOpen]);
+
+            if (!isOpen) return null;
+
+            const panelBg = theme === 'dark' ? 'bg-[#0f172a]/95' : 'bg-white/95';
+            const borderColor = theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200';
+            const textMain = theme === 'dark' ? 'text-white' : 'text-slate-800';
+            const textSub = theme === 'dark' ? 'text-slate-400' : 'text-slate-500';
+            const cardBg = theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50';
+
+            const filterCategories = [
+                { id: 'all', label: 'All', icon: Layers },
+                { id: 'voca', label: 'Vocabulary', icon: Book },
+                { id: 'phrase', label: 'Phrases', icon: MessageCircle },
+                { id: 'synonym', label: 'Synonyms', icon: LinkIcon },
+                { id: 'antonym', label: 'Antonyms', icon: ArrowLeftRight },
+            ];
+
+            const filteredItems = filter === 'all'
+                ? cemeteryItems
+                : cemeteryItems.filter(i => i.type === filter);
+
+            const formatTime = (timestamp) => {
+                if (!timestamp) return '';
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+                if (diffDays === 0) return 'Today';
+                if (diffDays === 1) return 'Yesterday';
+                if (diffDays < 7) return `${diffDays} days ago`;
+                return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            };
+
+            const getTypeColor = (type) => {
+                switch (type) {
+                    case 'voca': return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20';
+                    case 'synonym': return 'bg-violet-500/10 text-violet-500 border-violet-500/20';
+                    case 'antonym': return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+                    case 'phrase': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+                    default: return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+                }
+            };
+
+            const handleAdopt = async (item) => {
+                if (!user || adoptingId) return;
+                setAdoptingId(item.id);
+                try {
+                    await onAdopt(item);
+                } catch (err) {
+                    console.error('Error adopting word:', err);
+                }
+                setAdoptingId(null);
+            };
+
+            return (
+                <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+                    <div
+                        className={`${panelBg} backdrop-blur-xl w-full max-w-2xl max-h-[85vh] rounded-3xl shadow-2xl border ${borderColor} overflow-hidden animate-messenger-open flex flex-col`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className={`p-5 border-b ${borderColor} flex items-center justify-between shrink-0`}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-500 to-slate-600 flex items-center justify-center">
+                                    <Archive className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <h2 className={`text-lg font-bold ${textMain}`}>Lost & Found</h2>
+                                    <p className={`text-xs ${textSub}`}>Adopt abandoned words and help them find a new home</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={onClose}
+                                className={`p-2 rounded-xl ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-slate-100'} transition-colors`}
+                            >
+                                <X className={`w-5 h-5 ${textSub}`} />
+                            </button>
+                        </div>
+
+                        {/* Filter Tabs */}
+                        <div className={`px-4 py-3 border-b ${borderColor} shrink-0`}>
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                                {filterCategories.map(cat => {
+                                    const Icon = cat.icon;
+                                    const isActive = filter === cat.id;
+                                    const count = cat.id === 'all' ? cemeteryItems.length : cemeteryItems.filter(i => i.type === cat.id).length;
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => setFilter(cat.id)}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                                                isActive
+                                                    ? theme === 'dark' ? 'bg-white/10 text-white' : 'bg-slate-900 text-white'
+                                                    : theme === 'dark' ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            <Icon className="w-3.5 h-3.5" />
+                                            {cat.label}
+                                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${isActive ? 'bg-white/20' : theme === 'dark' ? 'bg-white/5' : 'bg-slate-200'}`}>
+                                                {count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Items List */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {isLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className={`w-8 h-8 animate-spin ${textSub}`} />
+                                </div>
+                            ) : filteredItems.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Archive className={`w-16 h-16 mx-auto mb-4 ${textSub} opacity-30`} />
+                                    <p className={`font-bold ${textMain}`}>No abandoned words yet</p>
+                                    <p className={`text-sm ${textSub}`}>When learners give up on words, they'll appear here</p>
+                                </div>
+                            ) : (
+                                <div className="grid gap-3">
+                                    {filteredItems.map(item => (
+                                        <div key={item.id} className={`${cardBg} rounded-2xl p-4 border ${borderColor}`}>
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex-1 min-w-0">
+                                                    {/* Type Badge & Word */}
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getTypeColor(item.type)}`}>
+                                                            {item.type}
+                                                        </span>
+                                                    </div>
+                                                    <h3 className={`text-lg font-bold ${textMain} truncate`}>{item.mainText}</h3>
+                                                    <p className={`text-sm ${textSub} truncate mt-0.5`}>
+                                                        {item.context || item.related?.join(', ') || item.pos || 'No definition'}
+                                                    </p>
+
+                                                    {/* Abandonment Info */}
+                                                    <div className="flex items-center gap-2 mt-3">
+                                                        {item.abandonedBy?.photoURL ? (
+                                                            <img src={item.abandonedBy.photoURL} className="w-5 h-5 rounded-full" alt="" />
+                                                        ) : (
+                                                            <div className="w-5 h-5 rounded-full bg-slate-500/20 flex items-center justify-center">
+                                                                <User className="w-3 h-3 text-slate-500" />
+                                                            </div>
+                                                        )}
+                                                        <span className={`text-xs ${textSub}`}>
+                                                            Released by {item.abandonedBy?.displayName || 'Anonymous'} • {formatTime(item.abandonedAt)}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Stats */}
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <span className={`text-xs ${textSub} flex items-center gap-1`}>
+                                                            <Heart className="w-3 h-3" /> {item.adoptionCount || 0} adopted
+                                                        </span>
+                                                        <span className={`text-xs ${textSub} flex items-center gap-1`}>
+                                                            <Trophy className="w-3 h-3" /> {item.rescueCount || 0} rescued
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Adopt Button */}
+                                                <button
+                                                    onClick={() => handleAdopt(item)}
+                                                    disabled={adoptingId === item.id}
+                                                    className="shrink-0 px-4 py-2 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                >
+                                                    {adoptingId === item.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <HeartHandshake className="w-4 h-4" />
+                                                    )}
+                                                    Adopt
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className={`px-4 py-3 border-t ${borderColor} shrink-0`}>
+                            <p className={`text-xs text-center ${textSub}`}>
+                                Adopt a word to add it to your learning list. Master it to earn the Rescuer badge!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- ADMIN PANEL COMPONENT ---
         const AdminPanel = ({ user, theme }) => {
             const [activeSection, setActiveSection] = useState('posts'); // 'posts', 'users', 'messages'
@@ -7610,6 +8036,10 @@ Respond with ONLY the JSON object, nothing else.`
             // Game state
             const [isGameOpen, setIsGameOpen] = useState(false);
 
+            // Cemetery / Lost & Found state
+            const [isCemeteryOpen, setIsCemeteryOpen] = useState(false);
+            const [giveUpConfirm, setGiveUpConfirm] = useState(null);
+
             // Function to view another user's profile
             const openPublicProfile = (targetUser) => {
                 setViewingUser(targetUser);
@@ -7617,7 +8047,7 @@ Respond with ONLY the JSON object, nothing else.`
             };
 
             // --- Body scroll lock: prevent background scroll when any modal is open ---
-            const isAnyModalOpen = confirmModal.isOpen || isMessengerOpen || isShareModalOpen || isSharingInboxOpen || isProfileModalOpen || isPublicProfileOpen || !!reviewQueue || isGameOpen;
+            const isAnyModalOpen = confirmModal.isOpen || isMessengerOpen || isShareModalOpen || isSharingInboxOpen || isProfileModalOpen || isPublicProfileOpen || !!reviewQueue || isGameOpen || isCemeteryOpen || !!giveUpConfirm;
             useEffect(() => {
                 if (isAnyModalOpen) {
                     document.body.style.overflow = 'hidden';
@@ -7637,6 +8067,8 @@ Respond with ONLY the JSON object, nothing else.`
 
                     // Close modals in priority order (topmost first)
                     if (isGameOpen) { setIsGameOpen(false); return; }
+                    if (giveUpConfirm) { setGiveUpConfirm(null); return; }
+                    if (isCemeteryOpen) { setIsCemeteryOpen(false); return; }
                     if (isPublicProfileOpen) { setIsPublicProfileOpen(false); setViewingUser(null); return; }
                     if (isProfileModalOpen) { setIsProfileModalOpen(false); return; }
                     if (isSharingInboxOpen) { setIsSharingInboxOpen(false); return; }
@@ -7808,8 +8240,166 @@ Respond with ONLY the JSON object, nothing else.`
 
             const handleUpdate = async (id, data) => { if (user) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id), data); };
             const handleUpdateSRS = async (id, data) => {
-                setReviewQueue(prevQueue => { if (!prevQueue) return null; return prevQueue.filter(item => item.id !== id); });
-                if (user) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id), data);
+                // Get the item before removing from queue to check for rescue
+                let itemToCheck = null;
+                setReviewQueue(prevQueue => {
+                    if (!prevQueue) return null;
+                    itemToCheck = prevQueue.find(item => item.id === id);
+                    return prevQueue.filter(item => item.id !== id);
+                });
+
+                if (user) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', id), data);
+
+                    // Check for rescue: adopted word crossing mastery threshold (interval > 21)
+                    if (itemToCheck?.adoptedFrom && data.interval > 21 && (itemToCheck.interval || 0) <= 21) {
+                        handleWordRescued(itemToCheck);
+                    }
+                }
+            };
+
+            // Handle when an adopted word is successfully mastered (rescued)
+            const handleWordRescued = async (item) => {
+                if (!user || !item?.adoptedFrom) return;
+                try {
+                    // 1. Increment rescue count in cemetery
+                    const cemeteryRef = doc(db, 'artifacts', appId, 'cemetery', item.adoptedFrom.cemeteryId);
+                    await updateDoc(cemeteryRef, { rescueCount: increment(1) }).catch(() => {
+                        // Cemetery item might have been deleted, that's okay
+                    });
+
+                    // 2. Update user's rescue stats and badge
+                    const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'metadata', 'stats');
+                    const statsSnap = await getDoc(statsRef);
+                    const stats = statsSnap.exists() ? statsSnap.data() : {};
+                    const newRescueCount = (stats.wordsRescued || 0) + 1;
+
+                    // Determine badge tier
+                    let badgeTier = 'bronze';
+                    if (newRescueCount >= 30) badgeTier = 'platinum';
+                    else if (newRescueCount >= 15) badgeTier = 'gold';
+                    else if (newRescueCount >= 5) badgeTier = 'silver';
+
+                    const previousTier = stats.badges?.rescuer?.tier;
+                    const badgeData = {
+                        earned: true,
+                        earnedAt: stats.badges?.rescuer?.earnedAt || Date.now(),
+                        tier: badgeTier,
+                        rescueCount: newRescueCount
+                    };
+
+                    await setDoc(statsRef, {
+                        wordsRescued: newRescueCount,
+                        badges: { rescuer: badgeData }
+                    }, { merge: true });
+
+                    // Show celebration toasts
+                    showToast(`Word rescued! You've mastered "${item.mainText}"`, 'success');
+
+                    // Show badge upgrade toast if tier changed
+                    if (previousTier !== badgeTier) {
+                        setTimeout(() => {
+                            showToast(`Badge earned: ${badgeTier.charAt(0).toUpperCase() + badgeTier.slice(1)} Rescuer!`, 'info');
+                        }, 1500);
+                    }
+                } catch (err) {
+                    console.error('Error recording rescue:', err);
+                }
+            };
+
+            // Cemetery / Lost & Found - Give Up handler
+            const handleGiveUp = async (item) => {
+                if (!user || !item) return;
+                try {
+                    // 1. Add to public cemetery
+                    await addDoc(collection(db, 'artifacts', appId, 'cemetery'), {
+                        type: item.type,
+                        mainText: item.mainText,
+                        context: item.context || '',
+                        pos: item.pos || '',
+                        ipa: item.ipa || '',
+                        example: item.example || '',
+                        collocations: item.collocations || '',
+                        related: item.related || [],
+                        abandonedBy: {
+                            uid: user.uid,
+                            displayName: user.displayName || 'Anonymous',
+                            photoURL: user.photoURL || ''
+                        },
+                        abandonedAt: Date.now(),
+                        failureCount: item.failureCount || 0,
+                        adoptionCount: 0,
+                        rescueCount: 0
+                    });
+
+                    // 2. Delete from user's vocabulary
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vocabulary', item.id));
+
+                    // 3. Update user stats
+                    const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'metadata', 'stats');
+                    await setDoc(statsRef, { wordsAbandoned: increment(1) }, { merge: true });
+
+                    // 4. Remove from review queue if present
+                    setReviewQueue(prevQueue => {
+                        if (!prevQueue) return null;
+                        return prevQueue.filter(i => i.id !== item.id);
+                    });
+
+                    showToast("Word released to Lost & Found. Someone might rescue it!", 'info');
+                    setGiveUpConfirm(null);
+                } catch (err) {
+                    console.error('Error giving up word:', err);
+                    showToast('Failed to release word', 'error');
+                }
+            };
+
+            // Handler for when ReviewSession suggests giving up
+            const handleSuggestGiveUp = (item) => {
+                setGiveUpConfirm(item);
+            };
+
+            // Cemetery / Lost & Found - Adopt word handler
+            const handleAdoptWord = async (cemeteryItem) => {
+                if (!user || !cemeteryItem) return;
+                try {
+                    // 1. Add to user's vocabulary with adoption metadata
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vocabulary'), {
+                        type: cemeteryItem.type,
+                        mainText: cemeteryItem.mainText,
+                        context: cemeteryItem.context || '',
+                        pos: cemeteryItem.pos || '',
+                        ipa: cemeteryItem.ipa || '',
+                        example: cemeteryItem.example || '',
+                        collocations: cemeteryItem.collocations || '',
+                        related: cemeteryItem.related || [],
+                        // Reset SRS values for fresh start
+                        easiness: 2.5,
+                        interval: 0,
+                        nextReview: Date.now(),
+                        failureCount: 0,
+                        // Adoption tracking
+                        adoptedFrom: {
+                            cemeteryId: cemeteryItem.id,
+                            originalOwner: cemeteryItem.abandonedBy,
+                            adoptedAt: Date.now()
+                        }
+                    });
+
+                    // 2. Increment adoption count in cemetery
+                    const cemeteryRef = doc(db, 'artifacts', appId, 'cemetery', cemeteryItem.id);
+                    await updateDoc(cemeteryRef, {
+                        adoptionCount: increment(1)
+                    });
+
+                    // 3. Update user stats
+                    const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'metadata', 'stats');
+                    await setDoc(statsRef, { wordsAdopted: increment(1) }, { merge: true });
+
+                    showToast(`"${cemeteryItem.mainText}" adopted! Good luck mastering it!`, 'success');
+                } catch (err) {
+                    console.error('Error adopting word:', err);
+                    showToast('Failed to adopt word', 'error');
+                }
             };
 
             const handleLogin = async () => {
@@ -7903,16 +8493,16 @@ Respond with ONLY the JSON object, nothing else.`
                 <div className={`min-h-screen pb-20 selection:bg-indigo-500 selection:text-white relative transition-colors duration-500 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>
                     <div className={`fixed inset-0 z-[-1] ${bgGradient} transition-colors duration-700`}></div>
 
-                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} setIsMessengerOpen={setIsMessengerOpen} totalUnreadMessages={totalUnreadMessages} setIsShareModalOpen={setIsShareModalOpen} setIsSharingInboxOpen={setIsSharingInboxOpen} shareRequestCount={shareRequests.length} setIsProfileModalOpen={setIsProfileModalOpen} />
+                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} items={items} streak={streak} theme={theme} toggleTheme={toggleTheme} setIsMessengerOpen={setIsMessengerOpen} totalUnreadMessages={totalUnreadMessages} setIsShareModalOpen={setIsShareModalOpen} setIsSharingInboxOpen={setIsSharingInboxOpen} shareRequestCount={shareRequests.length} setIsProfileModalOpen={setIsProfileModalOpen} setIsCemeteryOpen={setIsCemeteryOpen} />
 
                     <main>
                         {activeTab === 'landing' && (<LandingPage setActiveTab={setActiveTab} theme={theme} />)}
                         {activeTab === 'dashboard' && (<Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} onStartGame={() => setIsGameOpen(true)} />)}
-                        {activeTab === 'mylearning' && (<MyLearning items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} user={user} onShareToPeers={handleShareToPeers} />)}
+                        {activeTab === 'mylearning' && (<MyLearning items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} user={user} onShareToPeers={handleShareToPeers} onGiveUp={setGiveUpConfirm} />)}
                         {activeTab === 'peers' && (<Peers user={user} theme={theme} onViewProfile={openPublicProfile} />)}
                         {activeTab === 'admin' && (<AdminPanel user={user} theme={theme} />)}
                     </main>
-                    {reviewQueue && (<ReviewSession dueItems={reviewQueue} mode={reviewMode} onClose={() => setReviewQueue(null)} onComplete={handleUpdateSRS} theme={theme} />)}
+                    {reviewQueue && (<ReviewSession dueItems={reviewQueue} mode={reviewMode} onClose={() => setReviewQueue(null)} onComplete={handleUpdateSRS} theme={theme} onSuggestGiveUp={handleSuggestGiveUp} />)}
 
                     {/* Game Manager */}
                     {isGameOpen && (<GameManager user={user} onClose={() => setIsGameOpen(false)} items={items} theme={theme} />)}
@@ -7926,6 +8516,24 @@ Respond with ONLY the JSON object, nothing else.`
                         message={`You're about to permanently delete ${confirmModal.count} ${confirmModal.type || ''} item${confirmModal.count !== 1 ? 's' : ''}. This action cannot be undone.`}
                         confirmText="Delete All"
                         theme={theme}
+                    />
+
+                    {/* Give Up Confirmation Modal */}
+                    <GiveUpConfirmModal
+                        item={giveUpConfirm}
+                        onClose={() => setGiveUpConfirm(null)}
+                        onConfirm={handleGiveUp}
+                        theme={theme}
+                    />
+
+                    {/* Cemetery / Lost & Found Browser */}
+                    <CemeteryBrowser
+                        isOpen={isCemeteryOpen}
+                        onClose={() => setIsCemeteryOpen(false)}
+                        user={user}
+                        theme={theme}
+                        onAdopt={handleAdoptWord}
+                        showToast={showToast}
                     />
 
                     {/* Toast Notifications */}
