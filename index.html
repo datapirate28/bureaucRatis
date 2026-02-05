@@ -995,7 +995,7 @@
             const [view, setView] = useState('menu'); // menu, lobby, game, waiting, results
             const [gameId, setGameId] = useState('');
             const [players, setPlayers] = useState([]);
-            const [currentQIndex, setCurrentQIndex] = useState(0); // Local state only
+            const [currentQIndex, setCurrentQIndex] = useState(0);
             const [questions, setQuestions] = useState([]);
             const [isHost, setIsHost] = useState(false);
             const [status, setStatus] = useState('waiting');
@@ -1050,9 +1050,6 @@
 
                         if (remaining <= 0) {
                             clearInterval(interval);
-                            // If timer hits 0, game over.
-                            // Ideally Host triggers this update to DB, but clients should also react.
-                            // We rely on the snapshot listener to switch view to 'results' when host updates DB.
                             if (isHost) {
                                 updateDoc(doc(db, 'artifacts', appId, 'games', gameId), { status: 'finished' });
                             }
@@ -1072,7 +1069,6 @@
                 }
             }, [players, isHost, status, gameId]);
 
-
             const generateQuestions = () => {
                 const pool = items.filter(i => i.mainText && i.type !== 'phrase');
                 if (pool.length < 4) return [];
@@ -1086,14 +1082,11 @@
                         .map(p => p.mainText);
                     const options = [...wrongOptions, target.mainText].sort(() => 0.5 - Math.random());
 
-                    let type = 'definition';
                     let text = `What matches this definition: "${target.context || 'Definition unavailable'}"?`;
 
                     if (target.type === 'synonym' && Math.random() > 0.5) {
-                        type = 'synonym';
                         text = `Which word is a synonym for "${target.related?.[0] || '...'}"?`;
                     } else if (target.type === 'antonym' && Math.random() > 0.5) {
-                        type = 'antonym';
                         text = `Which word is an antonym for "${target.related?.[0] || '...'}"?`;
                     }
 
@@ -1173,11 +1166,9 @@
                     setScore(newScore); // Optimistic
 
                     const gameRef = doc(db, 'artifacts', appId, 'games', gameId);
-                    // Update score in DB
                     const freshSnap = await getDoc(gameRef);
                     if (freshSnap.exists()) {
-                        const freshData = freshSnap.data();
-                        const updatedPlayers = freshData.players.map(p =>
+                        const updatedPlayers = freshSnap.data().players.map(p =>
                             p.uid === user.uid ? { ...p, score: newScore } : p
                         );
                         await updateDoc(gameRef, { players: updatedPlayers });
@@ -1189,10 +1180,7 @@
                 const nextIdx = currentQIndex + 1;
 
                 if (nextIdx >= questions.length) {
-                    // Player Finished!
                     setView('waiting');
-
-                    // Mark as finished in DB & Check for Game Over
                     const gameRef = doc(db, 'artifacts', appId, 'games', gameId);
                     const freshSnap = await getDoc(gameRef);
                     if (freshSnap.exists()) {
@@ -1200,8 +1188,6 @@
                         const updatedPlayers = freshData.players.map(p =>
                             p.uid === user.uid ? { ...p, finished: true } : p
                         );
-
-                        // Check if ALL players are finished
                         const allFinished = updatedPlayers.every(p => p.finished);
 
                         if (allFinished) {
@@ -1211,186 +1197,299 @@
                         }
                     }
                 } else {
-                    // Next Question Local
                     setCurrentQIndex(nextIdx);
                     setSelectedAnswer(null);
                     setLastAnswerCorrect(null);
                 }
             };
 
-            const cardClass = theme === 'dark' ? 'bg-[#1e1e24] text-white border-white/10' : 'bg-white text-slate-800 border-slate-200';
+            // --- DESIGN UTILS ---
+            const glassEffect = theme === 'dark' ? 'bg-black/60 backdrop-blur-xl border-white/10' : 'bg-white/60 backdrop-blur-xl border-white/40';
 
             return (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-                    <div className={`${cardClass} w-full max-w-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden`}>
-                        <button onClick={onClose} className="absolute top-4 right-4 opacity-50 hover:opacity-100 p-2 z-10"><X className="w-6 h-6" /></button>
+                <div className="fixed inset-0 z-[200] flex flex-col bg-slate-950 text-white overflow-hidden animate-in fade-in duration-300">
+                    {/* Dynamic Background */}
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(79,70,229,0.3),_transparent_70%)] animate-pulse duration-[5000ms]"></div>
+                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-150 contrast-150"></div>
 
-                        {/* HEADER */}
-                        <div className="text-center mb-6 flex-shrink-0 relative">
-                            <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 text-white mb-3 shadow-lg">
-                                <Trophy className="w-8 h-8" />
+                    {/* Floating Header (Transparent) */}
+                    <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-6 pointer-events-none">
+                        {/* Left: Branding (Subtle) */}
+                        <div className={`flex items-center gap-3 transition-opacity duration-500 ${view === 'menu' ? 'opacity-0' : 'opacity-100'}`}>
+                            <div className="p-2 rounded-xl bg-white/5 backdrop-blur-sm border border-white/5 shadow-2xl">
+                                <Trophy className="w-5 h-5 text-yellow-500 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" />
                             </div>
-                            <h2 className="text-3xl font-black tracking-tight">Vocabulary Showdown</h2>
+                            <span className="font-bold tracking-widest uppercase text-xs text-white/40 hidden sm:block">Vocabulary Showdown</span>
+                        </div>
+
+                        {/* Right: Close Button & Timer */}
+                        <div className="flex items-center gap-4 pointer-events-auto">
                             {timeLeft !== null && view === 'game' && (
-                                <div className={`absolute top-0 right-0 sm:right-10 bg-slate-900 text-white px-3 py-1 rounded-full font-mono font-bold ${timeLeft < 10 ? 'bg-red-500 animate-pulse' : ''}`}>
+                                <div className={`px-4 py-2 rounded-full font-mono font-black text-xl backdrop-blur-md transition-all shadow-lg border border-white/10 ${timeLeft < 10 ? 'bg-red-500/20 text-red-200 animate-pulse border-red-500/50' : 'bg-black/20 text-white/90'}`}>
                                     {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                                 </div>
                             )}
-                        </div>
 
-                        {/* COMMON SCROLL CONTAINER */}
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar -mx-2 px-2">
-
-                            {/* VIEW: MENU */}
-                            {view === 'menu' && (
-                                <div className="min-h-full flex flex-col justify-center gap-6 py-4">
-                                    <button onClick={handleHost} className="w-full py-4 sm:py-5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-lg sm:text-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-3">
-                                        <Play className="w-6 h-6" /> Host Game
-                                    </button>
-                                    <div className="flex flex-col sm:flex-row gap-3">
-                                        <input
-                                            type="text"
-                                            placeholder="Enter 4-digit Code"
-                                            className={`flex-1 px-6 py-4 sm:py-0 rounded-2xl font-bold text-center tracking-widest text-xl outline-none focus:ring-2 ring-indigo-500 ${theme === 'dark' ? 'bg-white/5' : 'bg-slate-100'}`}
-                                            maxLength={4}
-                                            value={inputCode}
-                                            onChange={e => setInputCode(e.target.value)}
-                                        />
-                                        <button onClick={handleJoin} className="px-8 py-5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-lg shadow-lg">
-                                            Join
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* VIEW: LOBBY */}
-                            {view === 'lobby' && (
-                                <div className="min-h-full flex flex-col justify-center text-center space-y-6 py-4">
-                                    <div className="bg-slate-900 text-white py-3 px-6 sm:py-4 sm:px-8 rounded-2xl inline-block mx-auto">
-                                        <div className="text-xs sm:text-sm opacity-70 font-bold uppercase tracking-wider">Game Code</div>
-                                        <div className="text-4xl sm:text-5xl font-black tracking-widest">{gameId}</div>
-                                    </div>
-                                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                                        <h3 className="font-bold mb-3 opacity-70">Players ({players.length})</h3>
-                                        <div className="flex flex-wrap justify-center gap-2">
-                                            {players.map(p => (
-                                                <div key={p.uid} className="bg-indigo-500/20 text-indigo-400 px-3 py-1 rounded-full font-bold text-sm border border-indigo-500/30">
-                                                    {p.name}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="pt-4">
-                                        {isHost ? (
-                                            <button onClick={startGame} className="w-full py-4 rounded-xl bg-green-500 hover:bg-green-400 text-white font-bold text-lg shadow-lg animate-pulse">
-                                                Start Race (60s)
-                                            </button>
-                                        ) : (
-                                            <div className="text-lg font-bold animate-pulse">Waiting for host to start...</div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* VIEW: GAME */}
-                            {view === 'game' && questions[currentQIndex] && (
-                                <div className="flex flex-col min-h-full py-2">
-                                    <div className="flex justify-between items-center mb-6 text-sm font-bold opacity-70 bg-black/5 p-2 rounded-lg">
-                                        <span>Q{currentQIndex + 1}/{questions.length}</span>
-                                        <span className="text-indigo-500">Score: {score}</span>
-                                    </div>
-
-                                    <div className="flex-1 flex flex-col justify-center text-center">
-                                        <h3 className="text-xl sm:text-3xl font-bold mb-6 sm:mb-8 leading-tight">
-                                            {questions[currentQIndex].text}
-                                        </h3>
-
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pb-4">
-                                            {questions[currentQIndex].options.map((opt, idx) => {
-                                                let btnClass = theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-slate-50 hover:bg-slate-100';
-                                                if (selectedAnswer === opt) {
-                                                    btnClass = opt === questions[currentQIndex].correctAnswer
-                                                        ? 'bg-green-500 text-white ring-4 ring-green-500/30'
-                                                        : 'bg-red-500 text-white ring-4 ring-red-500/30';
-                                                } else if (selectedAnswer && opt === questions[currentQIndex].correctAnswer) {
-                                                    btnClass = 'bg-green-500/50 text-white';
-                                                }
-
-                                                return (
-                                                    <button
-                                                        key={idx}
-                                                        disabled={!!selectedAnswer}
-                                                        onClick={() => submitAnswer(opt)}
-                                                        className={`p-4 sm:p-6 rounded-2xl font-bold text-base sm:text-lg transition-all transform active:scale-95 text-left border-2 border-transparent ${btnClass}`}
-                                                    >
-                                                        {opt}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* Everyone has Next button now */}
-                                    <div className="mt-4 pt-4 border-t border-white/10">
-                                        <button
-                                            onClick={nextQuestion}
-                                            disabled={!selectedAnswer}
-                                            className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${selectedAnswer ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                                        >
-                                            Next Question <ChevronRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* VIEW: WAITING (Finished) */}
-                            {view === 'waiting' && (
-                                <div className="min-h-full flex flex-col items-center justify-center space-y-6 text-center">
-                                    <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center animate-bounce">
-                                        <Check className="w-10 h-10" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <h2 className="text-2xl font-black">All Done!</h2>
-                                        <p className="opacity-70">Waiting for other players to finish...</p>
-                                    </div>
-                                    {timeLeft !== null && (
-                                        <div className="text-4xl font-black font-mono">
-                                            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* VIEW: RESULTS */}
-                            {view === 'results' && (
-                                <div className="min-h-full flex flex-col items-center justify-center space-y-8 py-4 text-center">
-                                    <Trophy className="w-20 h-20 text-yellow-400 animate-bounce" />
-                                    <div className="space-y-2">
-                                        <h2 className="text-3xl sm:text-4xl font-black">Time's Up!</h2>
-                                        <p className="opacity-70 font-bold">Leaderboard</p>
-                                    </div>
-
-                                    <div className="w-full max-w-sm bg-black/10 rounded-2xl p-4 overflow-y-auto max-h-[40vh]">
-                                        {players.sort((a, b) => b.score - a.score).map((p, i) => (
-                                            <div key={p.uid} className={`flex justify-between items-center p-3 rounded-xl mb-2 ${p.uid === user.uid ? 'bg-indigo-500 text-white shadow-lg' : 'bg-white/5'}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`font-black w-6 text-center ${i === 0 ? 'text-yellow-400 text-xl' : 'opacity-50'}`}>#{i + 1}</span>
-                                                    <span className="font-bold">{p.name}</span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="font-mono font-bold">{p.score}</div>
-                                                    {p.finished && <div className="text-[10px] uppercase font-bold text-emerald-500">Done</div>}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <button onClick={onClose} className="px-8 py-3 bg-white text-black font-bold rounded-full shadow-lg hover:scale-105 transition-transform">Close Game</button>
-                                </div>
-                            )}
-
+                            <button
+                                onClick={onClose}
+                                className="group p-3 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/5 transition-all hover:scale-110 active:scale-95"
+                                title="Close Game"
+                            >
+                                <X className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
+                            </button>
                         </div>
                     </div>
+
+                    {/* VIEW: MENU */}
+                    {view === 'menu' && (
+                        <div className="flex-1 relative z-10 flex flex-col items-center justify-center p-6 space-y-16 animate-in zoom-in-95 duration-700">
+                            {/* Hero Title */}
+                            <div className="text-center space-y-6 relative">
+                                <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none"></div>
+
+                                <div className="relative inline-block">
+                                    <div className="absolute inset-0 bg-indigo-500 blur-[40px] opacity-20 animate-pulse"></div>
+                                    <Trophy className="relative w-24 h-24 sm:w-32 sm:h-32 text-yellow-500 drop-shadow-[0_0_25px_rgba(250,204,21,0.4)] mx-auto mb-6 animate-bounce duration-[3000ms]" />
+                                </div>
+
+                                <div>
+                                    <h1 className="text-5xl sm:text-7xl font-black tracking-tighter text-white mb-2 drop-shadow-2xl">
+                                        VOCAB<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">RACE</span>
+                                    </h1>
+                                    <p className="text-lg sm:text-xl text-white/50 font-medium tracking-wide">
+                                        Competitive Vocabulary Showdown
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md">
+                                <button
+                                    onClick={handleHost}
+                                    className="w-full sm:flex-1 group relative overflow-hidden rounded-2xl bg-indigo-600 p-1 transition-transform active:scale-95 shadow-[0_0_40px_rgba(79,70,229,0.3)] hover:shadow-[0_0_60px_rgba(79,70,229,0.5)]"
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className="relative h-full bg-slate-900/50 backdrop-blur-sm rounded-xl p-4 flex flex-col items-center justify-center gap-2 border border-white/10 group-hover:bg-slate-900/30 transition-colors">
+                                        <Play className="w-8 h-8 fill-indigo-400 text-indigo-400" />
+                                        <div className="font-black text-sm tracking-widest text-indigo-100 uppercase">Host Game</div>
+                                    </div>
+                                </button>
+
+                                <div className="hidden sm:flex flex-col items-center gap-1 opacity-20">
+                                    <div className="w-[1px] h-8 bg-white"></div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest">OR</div>
+                                    <div className="w-[1px] h-8 bg-white"></div>
+                                </div>
+
+                                <div className="w-full sm:flex-1 relative group">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur opacity-0 group-focus-within:opacity-40 transition-opacity"></div>
+                                    <div className="relative h-full bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 p-1 flex flex-col gap-2">
+                                        <input
+                                            value={inputCode} onChange={e => setInputCode(e.target.value)} maxLength={4}
+                                            placeholder="CODE"
+                                            className="w-full bg-transparent text-center font-black text-2xl placeholder:text-white/10 outline-none uppercase tracking-[0.2em] py-2"
+                                        />
+                                        <button
+                                            onClick={handleJoin}
+                                            className="w-full py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-white font-bold text-xs uppercase tracking-widest transition-colors border border-emerald-500/20 hover:border-emerald-500"
+                                        >
+                                            Join Room
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW: LOBBY */}
+                    {view === 'lobby' && (
+                        <div className="flex-1 relative z-10 flex flex-col items-center justify-center p-6 space-y-12 animate-in fade-in slide-in-from-bottom-4">
+                            <div className="text-center space-y-1">
+                                <div className="text-xs font-black uppercase tracking-[0.3em] text-white/30">Joining As</div>
+                                <div className="text-2xl font-bold text-white">{user.displayName || 'Guest'}</div>
+                            </div>
+
+                            <div className="relative group cursor-pointer" onClick={() => { navigator.clipboard.writeText(gameId); alert('Code copied!') }}>
+                                <div className="absolute inset-0 bg-indigo-500/20 blur-[30px] rounded-full group-hover:bg-indigo-500/30 transition-colors"></div>
+                                <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 sm:p-12 text-center transition-transform group-hover:scale-105 group-active:scale-95">
+                                    <div className="text-xs font-black uppercase tracking-[0.3em] text-indigo-300 mb-4 opacity-70">Room Code</div>
+                                    <div className="text-6xl sm:text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-white/50 shadow-2xl">
+                                        {gameId}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="w-full max-w-xl">
+                                <div className="flex items-center justify-between mb-4 px-4">
+                                    <h3 className="text-xs font-bold text-white/30 uppercase tracking-widest">Lobby ({players.length})</h3>
+                                    {isHost && <div className="text-[10px] font-bold bg-white/10 px-2 py-1 rounded text-white/50">YOU ARE HOST</div>}
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 justify-center mb-8">
+                                    {players.map(p => (
+                                        <div key={p.uid} className="flex items-center gap-3 pl-2 pr-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 animate-in zoom-in-50 duration-300">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center font-bold text-white text-xs shadow-lg">
+                                                {p.name.charAt(0)}
+                                            </div>
+                                            <span className="font-bold text-sm text-indigo-100">{p.name}</span>
+                                        </div>
+                                    ))}
+                                    {players.length === 0 && <div className="text-white/20 italic text-sm">Waiting for players to join...</div>}
+                                </div>
+
+                                {isHost ? (
+                                    <button onClick={startGame} className="w-full py-5 rounded-2xl bg-white text-slate-900 font-black text-xl tracking-wide shadow-[0_0_50px_rgba(255,255,255,0.3)] hover:shadow-[0_0_80px_rgba(255,255,255,0.4)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 group">
+                                        START RACE <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                                    </button>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-3 text-white/30 animate-pulse">
+                                        <Loader2 className="w-6 h-6 animate-spin" />
+                                        <span className="font-bold tracking-widest text-xs uppercase">Host will start the game</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW: GAME */}
+                    {view === 'game' && questions[currentQIndex] && (
+                        <div className="flex-1 relative z-10 flex flex-col p-4 sm:p-6 max-w-4xl mx-auto w-full">
+                            {/* Game Header */}
+                            {/* Progress & Score Tabs */}
+                            <div className="flex justify-between items-center mb-6 sm:mb-10 px-2">
+                                <div className="flex items-center gap-1">
+                                    {questions.map((_, i) => (
+                                        <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === currentQIndex ? 'w-8 bg-white shadow-[0_0_10px_white]' : i < currentQIndex ? 'w-2 bg-indigo-500' : 'w-2 bg-white/10'}`}></div>
+                                    ))}
+                                </div>
+                                <div className="flex flex-col items-end">
+                                    <div className="text-xs font-bold text-white/30 uppercase tracking-widest mb-0.5">SCORE</div>
+                                    <div className="font-black font-mono text-2xl text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-white">{score}</div>
+                                </div>
+                            </div>
+
+                            {/* Question Card */}
+                            <div className="flex-1 flex flex-col justify-center mb-8">
+                                <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden group">
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
+                                    <h2 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight text-center drop-shadow-md">
+                                        {questions[currentQIndex].text}
+                                    </h2>
+                                </div>
+                            </div>
+
+                            {/* Options */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5 pb-20 sm:pb-8">
+                                {questions[currentQIndex].options.map((opt, idx) => {
+                                    let btnStateClass = 'bg-white/5 hover:bg-white/10 border-white/10 text-white'; // Default
+
+                                    if (selectedAnswer === opt) {
+                                        if (opt === questions[currentQIndex].correctAnswer) {
+                                            btnStateClass = 'bg-emerald-500 text-white border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.4)] scale-[1.02] z-10';
+                                        } else {
+                                            btnStateClass = 'bg-rose-500 text-white border-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.4)] shake';
+                                        }
+                                    } else if (selectedAnswer && opt === questions[currentQIndex].correctAnswer) {
+                                        btnStateClass = 'bg-emerald-500/20 text-emerald-200 border-emerald-500/50'; // Reveal correct
+                                    } else if (selectedAnswer) {
+                                        btnStateClass = 'opacity-50 grayscale'; // Dim others
+                                    }
+
+                                    return (
+                                        <button
+                                            key={idx}
+                                            disabled={!!selectedAnswer}
+                                            onClick={() => submitAnswer(opt)}
+                                            className={`relative p-5 sm:p-8 rounded-2xl font-bold text-lg sm:text-2xl text-left border-2 transition-all active:scale-95 duration-200 ${btnStateClass}`}
+                                        >
+                                            {opt}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Floating Next Button */}
+                            {selectedAnswer && (
+                                <div className="fixed bottom-8 left-0 right-0 px-6 flex justify-center z-50 animate-in slide-in-from-bottom-20 duration-500">
+                                    <button
+                                        onClick={nextQuestion}
+                                        className="py-4 px-12 rounded-full bg-white text-slate-950 font-black text-lg tracking-widest uppercase shadow-[0_10px_40px_rgba(0,0,0,0.5)] hover:scale-105 hover:shadow-[0_20px_60px_rgba(255,255,255,0.3)] active:scale-95 transition-all flex items-center gap-3 ring-4 ring-white/10"
+                                    >
+                                        Next <ChevronRight className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* VIEW: WAITING */}
+                    {view === 'waiting' && (
+                        <div className="flex-1 relative z-10 flex flex-col items-center justify-center p-6 space-y-8 animate-in zoom-in-95">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-emerald-500/30 blur-[40px] animate-pulse"></div>
+                                <div className="relative w-32 h-32 rounded-full bg-slate-900 border border-emerald-500/30 flex items-center justify-center">
+                                    <Check className="w-16 h-16 text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.8)]" />
+                                </div>
+                            </div>
+                            <div className="text-center">
+                                <h2 className="text-5xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50">FINISHED!</h2>
+                                <p className="text-emerald-400 font-bold tracking-widest uppercase text-sm animate-pulse">Waiting for opponents...</p>
+                            </div>
+                            {timeLeft !== null && (
+                                <div className="absolute bottom-12 font-mono font-black text-white/20 text-xl">
+                                    Time Remaining: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* VIEW: RESULTS */}
+                    {view === 'results' && (
+                        <div className="flex-1 relative z-10 flex flex-col p-6 pt-20 animate-in slide-in-from-bottom-10">
+                            <div className="text-center mb-10 relative">
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-yellow-500/20 blur-[50px]"></div>
+                                <h2 className="relative text-6xl sm:text-8xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 drop-shadow-sm">VICTORY</h2>
+                                <p className="relative font-bold text-white/40 uppercase tracking-[0.3em] text-sm">Or Defeat...</p>
+                            </div>
+
+                            <div className="flex-1 w-full max-w-2xl mx-auto space-y-3 overflow-y-auto pb-24 custom-scrollbar">
+                                {players.sort((a, b) => b.score - a.score).map((p, i) => (
+                                    <div key={p.uid} className={`relative group p-4 sm:p-6 rounded-3xl border transition-all duration-500 ${p.uid === user.uid ? 'bg-white/10 border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.15)] z-10 scale-[1.02]' : 'bg-black/20 border-white/5 hover:bg-white/5'}`}>
+                                        <div className="flex items-center gap-6 relative z-10">
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg ${i === 0 ? 'bg-yellow-400 text-yellow-950' : i === 1 ? 'bg-zinc-300 text-zinc-900' : i === 2 ? 'bg-amber-700 text-amber-100' : 'bg-white/5 text-white/30'}`}>
+                                                {i + 1}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-bold text-xl text-white">{p.name}</div>
+                                                {p.finished && <div className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Completed Race</div>}
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-black text-3xl font-mono tracking-tighter">{p.score}</div>
+                                                <div className="text-[10px] font-bold text-white/30 uppercase">Points</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="fixed bottom-6 left-0 right-0 px-6 flex justify-center z-50">
+                                <button onClick={onClose} className="px-10 py-4 rounded-full bg-white text-black font-black text-lg shadow-[0_10px_40px_rgba(255,255,255,0.2)] hover:scale-110 transition-transform active:scale-95 ring-4 ring-white/20">
+                                    CLOSE
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CSS INJECTION For Specific Animations */}
+                    <style>{`
+                        @keyframes shake {
+                            0%, 100% { transform: translateX(0); }
+                            25% { transform: translateX(-5px); }
+                            75% { transform: translateX(5px); }
+                        }
+                        .shake { animation: shake 0.4s ease-in-out; }
+                        .text-shadow { text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+                    `}</style>
                 </div>
             );
         };
