@@ -988,7 +988,342 @@
             );
         };
 
-        const Dashboard = ({ items, onReview, dueCount, onLoadDemo, isAdding, onFlashcards, theme }) => {
+        // --- GAME MANAGER COMPONENT ---
+        const GameManager = ({ user, onClose, items, theme }) => {
+            const [view, setView] = useState('menu'); // menu, lobby, game, results
+            const [gameId, setGameId] = useState('');
+            const [players, setPlayers] = useState([]);
+            const [currentQIndex, setCurrentQIndex] = useState(0);
+            const [questions, setQuestions] = useState([]);
+            const [isHost, setIsHost] = useState(false);
+            const [status, setStatus] = useState('waiting'); // waiting, playing, finished
+            const [inputCode, setInputCode] = useState('');
+            const [selectedAnswer, setSelectedAnswer] = useState(null);
+            const [lastAnswerCorrect, setLastAnswerCorrect] = useState(null);
+            const [score, setScore] = useState(0);
+            const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+            // Listen to Game State
+            useEffect(() => {
+                if (!gameId) return;
+                const unsub = onSnapshot(doc(db, 'artifacts', appId, 'games', gameId), (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setStatus(data.status);
+                        setQuestions(data.questions || []);
+                        setCurrentQIndex(data.currentQuestion || 0);
+                        setPlayers(data.players || []);
+
+                        // Sync my score
+                        const myPlayer = data.players?.find(p => p.uid === user.uid);
+                        if (myPlayer) setScore(myPlayer.score);
+
+                        // Auto-advance to game if status changes to playing
+                        if (data.status === 'playing' && view === 'lobby') {
+                            setView('game');
+                        }
+                        // Auto-advance to results
+                        if (data.status === 'finished') {
+                            setView('results');
+                        }
+                    } else {
+                        // Game deleted or invalid
+                        if (view !== 'menu') {
+                            alert('Game ended or invalid code.');
+                            onClose();
+                        }
+                    }
+                });
+                return () => unsub();
+            }, [gameId, view, user.uid]);
+
+            const generateQuestions = () => {
+                // Generate 10 random questions from items
+                // Mix of Vocab, Synonyms, Antonyms
+                const pool = items.filter(i => i.mainText);
+                if (pool.length < 4) return []; // Need at least 4 items for options
+
+                const qList = [];
+                for (let i = 0; i < 10; i++) {
+                    const target = pool[Math.floor(Math.random() * pool.length)];
+                    const wrongOptions = pool.filter(p => p.id !== target.id)
+                        .sort(() => 0.5 - Math.random())
+                        .slice(0, 3)
+                        .map(p => p.mainText);
+
+                    const options = [...wrongOptions, target.mainText].sort(() => 0.5 - Math.random());
+
+                    // Simple question types
+                    let type = 'definition';
+                    let text = `What matches this definition: "${target.context || 'Definition unavailable'}"?`;
+
+                    if (target.type === 'synonym' && Math.random() > 0.5) {
+                        type = 'synonym';
+                        text = `Which word is a synonym for "${target.related?.[0] || '...'}"?`; // Simplified
+                    } else if (target.type === 'antonym' && Math.random() > 0.5) {
+                        type = 'antonym';
+                        text = `Which word is an antonym for "${target.related?.[0] || '...'}"?`;
+                    } else if (!target.context) {
+                        text = `Select the word that matches: ${target.mainText.split('').reverse().join('')} (reversed)`; // Fallback fun
+                    }
+
+                    // If context is empty, just ask "Which is correct?" (placeholder logic, improved below)
+                    if (!target.context && type === 'definition') {
+                        text = `Select the valid word from your list.`;
+                    }
+
+                    qList.push({
+                        id: Date.now() + i,
+                        text,
+                        correctAnswer: target.mainText,
+                        options,
+                        timer: 15
+                    });
+                }
+                return qList;
+            };
+
+            const handleHost = async () => {
+                const code = Math.floor(1000 + Math.random() * 9000).toString();
+                const newQuestions = generateQuestions();
+                if (newQuestions.length === 0) {
+                    alert("Not enough vocabulary items! Add at least 4 items.");
+                    return;
+                }
+
+                await setDoc(doc(db, 'artifacts', appId, 'games', code), {
+                    hostId: user.uid,
+                    status: 'waiting',
+                    currentQuestion: 0,
+                    players: [{ uid: user.uid, name: user.displayName || 'Host', score: 0 }],
+                    questions: newQuestions,
+                    timestamp: serverTimestamp()
+                });
+                setGameId(code);
+                setIsHost(true);
+                setView('lobby');
+            };
+
+            const handleJoin = async () => {
+                if (inputCode.length !== 4) return;
+                const gameRef = doc(db, 'artifacts', appId, 'games', inputCode);
+                const docSnap = await getDoc(gameRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.status !== 'waiting') {
+                        alert("Game already started or finished.");
+                        return;
+                    }
+                    // Add player
+                    const currentPlayers = data.players || [];
+                    if (!currentPlayers.find(p => p.uid === user.uid)) {
+                        await updateDoc(gameRef, {
+                            players: [...currentPlayers, { uid: user.uid, name: user.displayName || 'Guest', score: 0 }]
+                        });
+                    }
+                    setGameId(inputCode);
+                    setIsHost(data.hostId === user.uid);
+                    setView('lobby');
+                } else {
+                    alert("Game not found!");
+                }
+            };
+
+            const startGame = async () => {
+                if (!isHost) return;
+                await updateDoc(doc(db, 'artifacts', appId, 'games', gameId), {
+                    status: 'playing',
+                    currentQuestion: 0
+                });
+            };
+
+            const submitAnswer = async (ans) => {
+                if (selectedAnswer) return; // Prevent double answer
+                setSelectedAnswer(ans);
+
+                const currentQ = questions[currentQIndex];
+                const isCorrect = ans === currentQ.correctAnswer;
+                setLastAnswerCorrect(isCorrect);
+
+                // Update Score locally then push
+                if (isCorrect) {
+                    const newScore = score + 100; // Simple scoring
+                    // Optimistic update
+                    setScore(newScore);
+
+                    // Read fresh, update specific player
+                    // Note: Race conditions possible in real-time, but acceptable for this MVP
+                    const gameRef = doc(db, 'artifacts', appId, 'games', gameId);
+                    const freshSnap = await getDoc(gameRef);
+                    if (freshSnap.exists()) {
+                        const freshData = freshSnap.data();
+                        const updatedPlayers = freshData.players.map(p =>
+                            p.uid === user.uid ? { ...p, score: newScore } : p
+                        );
+                        await updateDoc(gameRef, { players: updatedPlayers });
+                    }
+                }
+            };
+
+            const nextQuestion = async () => {
+                if (!isHost) return;
+                const nextIdx = currentQIndex + 1;
+                if (nextIdx >= questions.length) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'games', gameId), { status: 'finished' });
+                } else {
+                    await updateDoc(doc(db, 'artifacts', appId, 'games', gameId), {
+                        currentQuestion: nextIdx
+                    });
+                }
+                // Reset local state for next Q (listeners will handle UI update, but we need to reset selection)
+            };
+
+            // Reset selection when question index changes
+            useEffect(() => {
+                setSelectedAnswer(null);
+                setLastAnswerCorrect(null);
+            }, [currentQIndex]);
+
+            // Render Helpers
+            const cardClass = theme === 'dark' ? 'bg-[#1e1e24] text-white border-white/10' : 'bg-white text-slate-800 border-slate-200';
+
+            return (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+                    <div className={`${cardClass} w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative flex flex-col max-h-[90vh]`}>
+                        <button onClick={onClose} className="absolute top-4 right-4 opacity-50 hover:opacity-100 p-2"><X className="w-6 h-6" /></button>
+
+                        {/* HEADER */}
+                        <div className="text-center mb-6">
+                            <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 text-white mb-3 shadow-lg">
+                                <Trophy className="w-8 h-8" />
+                            </div>
+                            <h2 className="text-3xl font-black tracking-tight">Vocabulary Showdown</h2>
+                        </div>
+
+                        {/* VIEW: MENU */}
+                        {view === 'menu' && (
+                            <div className="space-y-4 flex-1 flex flex-col justify-center">
+                                <button onClick={handleHost} className="w-full py-5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-3">
+                                    <Play className="w-6 h-6" /> Host Game
+                                </button>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Enter 4-digit Code"
+                                        className={`flex-1 px-6 rounded-2xl font-bold text-center tracking-widest text-xl outline-none focus:ring-2 ring-indigo-500 ${theme === 'dark' ? 'bg-white/5' : 'bg-slate-100'}`}
+                                        maxLength={4}
+                                        value={inputCode}
+                                        onChange={e => setInputCode(e.target.value)}
+                                    />
+                                    <button onClick={handleJoin} className="px-8 py-5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-lg shadow-lg">
+                                        Join
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* VIEW: LOBBY */}
+                        {view === 'lobby' && (
+                            <div className="text-center space-y-6">
+                                <div className="bg-slate-900 text-white py-4 px-8 rounded-2xl inline-block">
+                                    <div className="text-sm opacity-70 font-bold uppercase tracking-wider">Game Code</div>
+                                    <div className="text-5xl font-black tracking-widest">{gameId}</div>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                                    <h3 className="font-bold mb-3 opacity-70">Players ({players.length})</h3>
+                                    <div className="flex flex-wrap justify-center gap-2">
+                                        {players.map(p => (
+                                            <div key={p.uid} className="bg-indigo-500/20 text-indigo-400 px-3 py-1 rounded-full font-bold text-sm border border-indigo-500/30">
+                                                {p.name}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                {isHost ? (
+                                    <button onClick={startGame} className="w-full py-4 rounded-xl bg-green-500 hover:bg-green-400 text-white font-bold text-lg shadow-lg animate-pulse">
+                                        Start Game
+                                    </button>
+                                ) : (
+                                    <div className="text-lg font-bold animate-pulse">Waiting for host to start...</div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* VIEW: GAME */}
+                        {view === 'game' && questions[currentQIndex] && (
+                            <div className="flex-1 flex flex-col">
+                                <div className="flex justify-between items-center mb-6 text-sm font-bold opacity-70 bg-black/5 p-2 rounded-lg">
+                                    <span>Q{currentQIndex + 1}/{questions.length}</span>
+                                    <span className="text-indigo-500">Score: {score}</span>
+                                </div>
+
+                                <div className="flex-1 flex flex-col justify-center text-center">
+                                    <h3 className="text-2xl sm:text-3xl font-bold mb-8 leading-tight">
+                                        {questions[currentQIndex].text}
+                                    </h3>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                        {questions[currentQIndex].options.map((opt, idx) => {
+                                            let btnClass = theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-slate-50 hover:bg-slate-100';
+                                            if (selectedAnswer === opt) {
+                                                btnClass = opt === questions[currentQIndex].correctAnswer
+                                                    ? 'bg-green-500 text-white ring-4 ring-green-500/30'
+                                                    : 'bg-red-500 text-white ring-4 ring-red-500/30';
+                                            } else if (selectedAnswer && opt === questions[currentQIndex].correctAnswer) {
+                                                btnClass = 'bg-green-500/50 text-white'; // Show correct if wrong picked
+                                            }
+
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    disabled={!!selectedAnswer}
+                                                    onClick={() => submitAnswer(opt)}
+                                                    className={`p-6 rounded-2xl font-bold text-lg transition-all transform active:scale-95 text-left border-2 border-transparent ${btnClass}`}
+                                                >
+                                                    {opt}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {isHost && (
+                                    <div className="mt-6 pt-4 border-t border-white/10">
+                                        <button onClick={nextQuestion} className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold">
+                                            Next Question <ChevronRight className="inline w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* VIEW: RESULTS */}
+                        {view === 'results' && (
+                            <div className="text-center flex-1 flex flex-col items-center justify-center space-y-8">
+                                <Trophy className="w-20 h-20 text-yellow-400 animate-bounce" />
+                                <h2 className="text-4xl font-black">Game Over!</h2>
+
+                                <div className="w-full max-w-sm bg-black/10 rounded-2xl p-4">
+                                    {players.sort((a, b) => b.score - a.score).map((p, i) => (
+                                        <div key={p.uid} className={`flex justify-between items-center p-3 rounded-xl mb-2 ${p.uid === user.uid ? 'bg-indigo-500 text-white shadow-lg' : 'bg-white/5'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`font-black w-6 text-center ${i === 0 ? 'text-yellow-400 text-xl' : 'opacity-50'}`}>#{i + 1}</span>
+                                                <span className="font-bold">{p.name}</span>
+                                            </div>
+                                            <span className="font-mono font-bold">{p.score}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button onClick={onClose} className="px-8 py-3 bg-white text-black font-bold rounded-full">Close Game</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const Dashboard = ({ items, onReview, dueCount, onLoadDemo, isAdding, onFlashcards, theme, onStartGame }) => {
             const stats = useMemo(() => {
                 const total = items.length;
                 const mastered = items.filter(i => i.interval > 21).length;
@@ -1064,6 +1399,7 @@
                             <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 md:gap-4">
                                 <button onClick={() => setShowReviewModal(true)} disabled={dueCount === 0} className={`flex items-center justify-center gap-2 px-5 sm:px-6 md:px-8 py-3 sm:py-3.5 md:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base transition-all shadow-lg transform active:scale-95 ${dueCount > 0 ? 'bg-white text-indigo-600 hover:bg-indigo-50 cursor-pointer' : 'bg-black/20 text-white/50 cursor-not-allowed'}`}><Repeat className="w-4 h-4 sm:w-5 sm:h-5" /> {dueCount > 0 ? 'Start Review Session' : 'All Caught Up!'}</button>
                                 <button onClick={() => setShowFlashcardModal(true)} className="flex items-center justify-center gap-2 px-5 sm:px-6 md:px-8 py-3 sm:py-3.5 md:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base bg-white/10 text-white hover:bg-white/20 border border-white/20 transition-all shadow-lg backdrop-blur-sm"><Layers className="w-4 h-4 sm:w-5 sm:h-5" /> Flashcards</button>
+                                <button onClick={onStartGame} className="flex items-center justify-center gap-2 px-5 sm:px-6 md:px-8 py-3 sm:py-3.5 md:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:opacity-90 border border-white/20 transition-all shadow-lg hover:scale-105 active:scale-95"><Trophy className="w-4 h-4 sm:w-5 sm:h-5" /> Play Game</button>
                                 {items.length === 0 && (
                                     <button onClick={onLoadDemo} disabled={isAdding} className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base bg-indigo-500/30 text-white hover:bg-indigo-500/40 border border-white/20 transition-all disabled:opacity-50">{isAdding ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />} Load Example Data</button>
                                 )}
@@ -7027,6 +7363,9 @@ Respond with ONLY the JSON object, nothing else.`
             const [isPublicProfileOpen, setIsPublicProfileOpen] = useState(false);
             const [viewingUser, setViewingUser] = useState(null);
 
+            // Game state
+            const [isGameOpen, setIsGameOpen] = useState(false);
+
             // Function to view another user's profile
             const openPublicProfile = (targetUser) => {
                 setViewingUser(targetUser);
@@ -7034,7 +7373,7 @@ Respond with ONLY the JSON object, nothing else.`
             };
 
             // --- Body scroll lock: prevent background scroll when any modal is open ---
-            const isAnyModalOpen = confirmModal.isOpen || isMessengerOpen || isShareModalOpen || isSharingInboxOpen || isProfileModalOpen || isPublicProfileOpen || !!reviewQueue;
+            const isAnyModalOpen = confirmModal.isOpen || isMessengerOpen || isShareModalOpen || isSharingInboxOpen || isProfileModalOpen || isPublicProfileOpen || !!reviewQueue || isGameOpen;
             useEffect(() => {
                 if (isAnyModalOpen) {
                     document.body.style.overflow = 'hidden';
@@ -7053,6 +7392,7 @@ Respond with ONLY the JSON object, nothing else.`
                     window.history.pushState({ bureaucRatis: true }, '');
 
                     // Close modals in priority order (topmost first)
+                    if (isGameOpen) { setIsGameOpen(false); return; }
                     if (isPublicProfileOpen) { setIsPublicProfileOpen(false); setViewingUser(null); return; }
                     if (isProfileModalOpen) { setIsProfileModalOpen(false); return; }
                     if (isSharingInboxOpen) { setIsSharingInboxOpen(false); return; }
@@ -7070,7 +7410,7 @@ Respond with ONLY the JSON object, nothing else.`
 
                 window.addEventListener('popstate', handlePopState);
                 return () => window.removeEventListener('popstate', handlePopState);
-            }, [isPublicProfileOpen, isProfileModalOpen, isSharingInboxOpen, isShareModalOpen, confirmModal.isOpen, isMessengerOpen, reviewQueue]);
+            }, [isPublicProfileOpen, isProfileModalOpen, isSharingInboxOpen, isShareModalOpen, confirmModal.isOpen, isMessengerOpen, reviewQueue, isGameOpen]);
 
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -7080,6 +7420,12 @@ Respond with ONLY the JSON object, nothing else.`
                 });
                 return () => unsubscribe();
             }, []);
+            // ... (omitting unchanged useEffects) ...
+            // Instead of replacing the huge chunk, I will target specific chunks with multi_replace_file_content if I could, but wait, the instruction is replace_file_content.
+            // I will target the rendering part separately or try to catch state definition and useEffects here.
+            // Actually, using `replace_file_content` for non-contiguous changes is risky. 
+            // I should use `multi_replace_file_content` because I'm touching state def, back button logic, and rendering logic which are far apart.
+
 
             useEffect(() => {
                 if (!user) return;
@@ -7317,12 +7663,15 @@ Respond with ONLY the JSON object, nothing else.`
 
                     <main>
                         {activeTab === 'landing' && (<LandingPage setActiveTab={setActiveTab} theme={theme} />)}
-                        {activeTab === 'dashboard' && (<Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} />)}
+                        {activeTab === 'dashboard' && (<Dashboard items={items} dueCount={dueItems.length} onReview={startDueReview} onLoadDemo={handleLoadDemo} isAdding={isAdding} onFlashcards={startFlashcardSession} theme={theme} onStartGame={() => setIsGameOpen(true)} />)}
                         {activeTab === 'mylearning' && (<MyLearning items={items} onAdd={handleAdd} onDelete={handleDelete} onDeleteAll={showDeleteAllConfirm} onUpdate={handleUpdate} theme={theme} user={user} onShareToPeers={handleShareToPeers} />)}
                         {activeTab === 'peers' && (<Peers user={user} theme={theme} onViewProfile={openPublicProfile} />)}
                         {activeTab === 'admin' && (<AdminPanel user={user} theme={theme} />)}
                     </main>
                     {reviewQueue && (<ReviewSession dueItems={reviewQueue} mode={reviewMode} onClose={() => setReviewQueue(null)} onComplete={handleUpdateSRS} theme={theme} />)}
+
+                    {/* Game Manager */}
+                    {isGameOpen && (<GameManager user={user} onClose={() => setIsGameOpen(false)} items={items} theme={theme} />)}
 
                     {/* Custom Confirmation Modal */}
                     <ConfirmModal
