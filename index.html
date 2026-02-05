@@ -569,30 +569,30 @@
                             </div>
                         )}
                     </div>
-                    <div className="flex flex-row flex-wrap gap-1.5 justify-end max-w-[90px]">
+                    <div className="flex flex-row flex-wrap gap-2 sm:gap-1.5 justify-end max-w-[110px] sm:max-w-[90px]">
                         {onSpeak && (
-                            <button onClick={onSpeak} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
-                                <Volume2 className="w-4 h-4" />
+                            <button onClick={onSpeak} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
+                                <Volume2 className="w-5 h-5 sm:w-4 sm:h-4" />
                             </button>
                         )}
                         {onShare && (
-                            <button onClick={onShare} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-500 hover:text-emerald-600'}`} title="Share to Peers">
-                                <Share2 className="w-4 h-4" />
+                            <button onClick={onShare} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-500 hover:text-emerald-600'}`} title="Share to Peers">
+                                <Share2 className="w-5 h-5 sm:w-4 sm:h-4" />
                             </button>
                         )}
                         {onGiveUp && !sharedBy && (
-                            <button onClick={onGiveUp} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300' : 'bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600'}`} title="Let it go to Lost & Found">
-                                <Flag className="w-4 h-4" />
+                            <button onClick={onGiveUp} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300' : 'bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600'}`} title="Let it go to Lost & Found">
+                                <Flag className="w-5 h-5 sm:w-4 sm:h-4" />
                             </button>
                         )}
                         {onEdit && (
-                            <button onClick={onEdit} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
-                                <Pencil className="w-4 h-4" />
+                            <button onClick={onEdit} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${btnBg}`}>
+                                <Pencil className="w-5 h-5 sm:w-4 sm:h-4" />
                             </button>
                         )}
                         {onDelete && (
-                            <button onClick={onDelete} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300' : 'bg-rose-50 hover:bg-rose-100 text-rose-500 hover:text-rose-600'}`}>
-                                <Trash2 className="w-4 h-4" />
+                            <button onClick={onDelete} className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors ${theme === 'dark' ? 'bg-white/5 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300' : 'bg-rose-50 hover:bg-rose-100 text-rose-500 hover:text-rose-600'}`}>
+                                <Trash2 className="w-5 h-5 sm:w-4 sm:h-4" />
                             </button>
                         )}
                     </div>
@@ -781,7 +781,7 @@
                                             : `${textBase} ${textHover}`
                                             }`}
                                     >
-                                        <item.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden md:inline">{item.label}</span>
+                                        <item.icon className="w-5 h-5 lg:w-4 lg:h-4" /> <span className="hidden md:inline">{item.label}</span>
                                     </button>
                                 ))}
                             </div>
