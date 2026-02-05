@@ -23,7 +23,10 @@
     <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- 2. React & ReactDOM Import Map -->
+    <!-- 2. ES Module Shims Polyfill for Safari/older browsers -->
+    <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.0/dist/es-module-shims.js" crossorigin="anonymous"></script>
+
+    <!-- 3. React & ReactDOM Import Map -->
     <script type="importmap">
     {
       "imports": {
@@ -356,7 +359,22 @@
 </head>
 
 <body class="font-sans overflow-x-hidden transition-colors duration-500">
-    <div id="root"></div>
+    <div id="root">
+        <!-- Initial Loading State (shown while scripts load) -->
+        <div id="initial-loader" style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-family: system-ui, -apple-system, sans-serif;">
+            <div style="width: 60px; height: 60px; border: 4px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <p style="margin-top: 20px; font-size: 18px; font-weight: 600;">Loading bureaucRatis...</p>
+            <p style="margin-top: 8px; font-size: 14px; opacity: 0.8;">Please wait while we set things up</p>
+            <noscript>
+                <p style="margin-top: 20px; padding: 16px; background: rgba(255,0,0,0.2); border-radius: 8px;">
+                    JavaScript is required to run this app. Please enable JavaScript in your browser settings.
+                </p>
+            </noscript>
+        </div>
+        <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
+    </div>
 
     <!-- Service Worker Registration & Install Prompt -->
     <script>
@@ -378,13 +396,20 @@
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
                     .then((registration) => {
                         console.log('SW registered:', registration.scope);
+                        // Check for updates
+                        registration.update();
                     })
                     .catch((error) => {
-                        console.log('SW registration failed:', error);
+                        console.log('SW registration failed (non-critical):', error);
                     });
+            });
+
+            // Handle service worker updates
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                console.log('New service worker activated');
             });
         }
     </script>
@@ -392,10 +417,37 @@
     <!-- Error Handler -->
     <script>
         window.onerror = function (message, source, lineno, colno, error) {
-            if (document.getElementById('root').innerHTML === "") {
-                console.error(message);
+            console.error('App error:', message, source, lineno);
+            var root = document.getElementById('root');
+            var loader = document.getElementById('initial-loader');
+            // Show error if app hasn't loaded yet
+            if (loader) {
+                loader.innerHTML = '<div style="text-align: center; padding: 20px;">' +
+                    '<p style="font-size: 24px; margin-bottom: 16px;">Something went wrong</p>' +
+                    '<p style="font-size: 14px; opacity: 0.8; margin-bottom: 20px;">Please try refreshing the page or clearing your browser cache.</p>' +
+                    '<button onclick="location.reload()" style="padding: 12px 24px; background: white; color: #667eea; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Refresh Page</button>' +
+                    '<p style="font-size: 12px; opacity: 0.6; margin-top: 16px;">Error: ' + message + '</p>' +
+                    '</div>';
             }
         };
+
+        // Timeout fallback - show error if app doesn't load within 30 seconds
+        setTimeout(function() {
+            var loader = document.getElementById('initial-loader');
+            if (loader && loader.querySelector('div[style*="border-radius: 50%"]')) {
+                loader.innerHTML = '<div style="text-align: center; padding: 20px;">' +
+                    '<p style="font-size: 24px; margin-bottom: 16px;">Taking too long to load</p>' +
+                    '<p style="font-size: 14px; opacity: 0.8; margin-bottom: 20px;">This could be due to a slow connection. Please try:</p>' +
+                    '<ul style="text-align: left; max-width: 300px; margin: 0 auto 20px; font-size: 14px; opacity: 0.9;">' +
+                    '<li style="margin-bottom: 8px;">Checking your internet connection</li>' +
+                    '<li style="margin-bottom: 8px;">Disabling browser extensions</li>' +
+                    '<li style="margin-bottom: 8px;">Enabling cookies and JavaScript</li>' +
+                    '<li style="margin-bottom: 8px;">Trying a different browser</li>' +
+                    '</ul>' +
+                    '<button onclick="location.reload()" style="padding: 12px 24px; background: white; color: #667eea; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Try Again</button>' +
+                    '</div>';
+            }
+        }, 30000);
     </script>
 
     <!-- 4. Application Logic -->
@@ -423,6 +475,8 @@
             signInWithCustomToken,
             GoogleAuthProvider,
             signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
             linkWithPopup,
             signOut
         } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
@@ -8640,6 +8694,22 @@ Respond with ONLY the JSON object, nothing else.`
                 return () => unsubscribe();
             }, []);
 
+            // Handle redirect result from Google Sign-In (for mobile browsers)
+            useEffect(() => {
+                getRedirectResult(auth)
+                    .then((result) => {
+                        if (result?.user) {
+                            console.log('Sign-in redirect successful');
+                        }
+                    })
+                    .catch((err) => {
+                        if (err.code !== 'auth/no-redirect-operation') {
+                            console.error('Redirect sign-in error:', err);
+                            setAuthError(err.message);
+                        }
+                    });
+            }, []);
+
             // Time Tracking
             useEffect(() => {
                 if (!user) return;
@@ -9055,7 +9125,29 @@ Respond with ONLY the JSON object, nothing else.`
                     return;
                 }
                 const provider = new GoogleAuthProvider();
-                try { await signInWithPopup(auth, provider); } catch (err) { setAuthError(err.message); }
+                // Detect if on mobile/tablet - use redirect instead of popup for better compatibility
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                    || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+
+                try {
+                    if (isMobile) {
+                        // Redirect works better on mobile browsers (Safari, Chrome Android, etc.)
+                        await signInWithRedirect(auth, provider);
+                    } else {
+                        await signInWithPopup(auth, provider);
+                    }
+                } catch (err) {
+                    // If popup blocked, try redirect as fallback
+                    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+                        try {
+                            await signInWithRedirect(auth, provider);
+                        } catch (redirectErr) {
+                            setAuthError(redirectErr.message);
+                        }
+                    } else {
+                        setAuthError(err.message);
+                    }
+                }
             };
 
             const handleLogout = async () => { await signOut(auth); window.location.reload(); };
