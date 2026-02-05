@@ -2132,19 +2132,19 @@ Respond with ONLY the JSON object, nothing else.`
                         </div>
 
                         {/* Category Tabs */}
-                        <div className="flex flex-wrap gap-3 mt-8">
+                        <div className="flex gap-2 sm:gap-3 mt-6 sm:mt-8 overflow-x-auto pb-2 -mx-2 px-2">
                             {categories.map(cat => (
                                 <button
                                     key={cat.id}
                                     onClick={() => setActiveCategory(cat.id)}
-                                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold transition-all duration-300 ${activeCategory === cat.id
+                                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-bold transition-all duration-300 whitespace-nowrap shrink-0 text-sm sm:text-base ${activeCategory === cat.id
                                         ? `bg-gradient-to-r ${cat.color} text-white shadow-lg scale-105`
                                         : `${theme === 'dark' ? 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50' : 'bg-white/50 text-slate-600 hover:bg-white/80'}`
                                         }`}
                                 >
-                                    <cat.icon className="w-4 h-4" />
+                                    <cat.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     <span>{cat.label}</span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs ${activeCategory === cat.id
+                                    <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-xs ${activeCategory === cat.id
                                         ? 'bg-white/20'
                                         : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'
                                         }`}>{cat.count}</span>
