@@ -1,10 +1,10 @@
-const CACHE_NAME = 'bureaucratis-v3';
+const CACHE_NAME = 'bureaucratis-v2';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/manifest.json'
+  './',
+  './index.html',
+  './icon-192.png',
+  './icon-512.png',
+  './manifest.json'
 ];
 
 // Install service worker and cache resources
@@ -49,15 +49,11 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
   
-  // Skip Firebase, CDN and external API requests (they need fresh data)
+  // Skip Firebase and external API requests (they need fresh data)
   const url = new URL(event.request.url);
-  if (url.hostname.includes('firebase') ||
+  if (url.hostname.includes('firebase') || 
       url.hostname.includes('gstatic') ||
-      url.hostname.includes('googleapis') ||
-      url.hostname.includes('esm.sh') ||
-      url.hostname.includes('unpkg.com') ||
-      url.hostname.includes('cdn.tailwindcss.com') ||
-      url.hostname.includes('jspm.io')) {
+      url.hostname.includes('googleapis')) {
     return;
   }
 
@@ -83,9 +79,8 @@ self.addEventListener('fetch', (event) => {
             }
             // Return offline fallback for navigation requests
             if (event.request.mode === 'navigate') {
-              return caches.match('/index.html').then(r => r || caches.match('/'));
+              return caches.match('/index.html');
             }
-            return undefined;
           });
       })
   );
