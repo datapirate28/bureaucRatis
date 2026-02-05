@@ -8686,10 +8686,39 @@ Respond with ONLY the JSON object, nothing else.`
             }, [isPublicProfileOpen, isProfileModalOpen, isSharingInboxOpen, isShareModalOpen, confirmModal.isOpen, isMessengerOpen, reviewQueue, isGameOpen, isCemeteryOpen, giveUpConfirm]);
 
             useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                const unsubscribe = onAuthStateChanged(auth, async (u) => {
                     setUser(u);
                     setLoading(false);
-                    if (u) checkStreak(u);
+                    if (u) {
+                        checkStreak(u);
+                        // Save user to chatUsers collection so they appear in admin panel
+                        try {
+                            const userRef = doc(db, 'artifacts', appId, 'chatUsers', u.uid);
+                            const userDoc = await getDoc(userRef);
+                            if (!userDoc.exists()) {
+                                // New user - create with createdAt
+                                await setDoc(userRef, {
+                                    uid: u.uid,
+                                    displayName: u.displayName || 'Anonymous',
+                                    photoURL: u.photoURL || '',
+                                    email: u.email || '',
+                                    createdAt: Date.now(),
+                                    lastSeen: Date.now()
+                                });
+                            } else {
+                                // Existing user - just update lastSeen and profile info
+                                await setDoc(userRef, {
+                                    uid: u.uid,
+                                    displayName: u.displayName || 'Anonymous',
+                                    photoURL: u.photoURL || '',
+                                    email: u.email || '',
+                                    lastSeen: Date.now()
+                                }, { merge: true });
+                            }
+                        } catch (err) {
+                            console.error('Error saving user to chatUsers:', err);
+                        }
+                    }
                 });
                 return () => unsubscribe();
             }, []);

@@ -303,22 +303,135 @@ exports.unbanUser = functions.https.onCall(async (data, context) => {
  */
 exports.getAdminStats = functions.https.onCall(async (data, context) => {
     await verifyAdmin(context);
-    
+
     try {
         const [usersSnapshot, postsSnapshot, conversationsSnapshot] = await Promise.all([
             db.collection("artifacts").doc(APP_ID).collection("chatUsers").get(),
             db.collection("artifacts").doc(APP_ID).collection("peerPosts").get(),
             db.collection("artifacts").doc(APP_ID).collection("conversations").get(),
         ]);
-        
+
         return {
             totalUsers: usersSnapshot.size,
             totalPosts: postsSnapshot.size,
             totalConversations: conversationsSnapshot.size,
         };
-        
+
     } catch (error) {
         console.error("Error getting stats:", error);
         throw new functions.https.HttpsError("internal", "Error getting stats: " + error.message);
+    }
+});
+
+/**
+ * Migrate all Firebase Auth users to chatUsers collection
+ * This is a one-time migration function to backfill existing users
+ *
+ * Call from client (admin only):
+ * const migrateUsers = firebase.functions().httpsCallable('migrateAuthUsersToChatUsers');
+ * await migrateUsers();
+ */
+exports.migrateAuthUsersToChatUsers = functions.https.onCall(async (data, context) => {
+    await verifyAdmin(context);
+
+    const results = {
+        totalAuthUsers: 0,
+        alreadyExisted: 0,
+        newlyCreated: 0,
+        errors: [],
+    };
+
+    try {
+        // List all users from Firebase Auth (handles pagination automatically)
+        const listAllUsers = async (nextPageToken) => {
+            const listUsersResult = await auth.listUsers(1000, nextPageToken);
+
+            for (const userRecord of listUsersResult.users) {
+                results.totalAuthUsers++;
+
+                try {
+                    const chatUserRef = db.collection("artifacts").doc(APP_ID)
+                        .collection("chatUsers").doc(userRecord.uid);
+
+                    const existingDoc = await chatUserRef.get();
+
+                    if (existingDoc.exists) {
+                        // User already exists in chatUsers, just update profile info
+                        await chatUserRef.update({
+                            displayName: userRecord.displayName || existingDoc.data().displayName || "Anonymous",
+                            photoURL: userRecord.photoURL || existingDoc.data().photoURL || "",
+                            email: userRecord.email || existingDoc.data().email || "",
+                            lastSeen: Date.now(),
+                        });
+                        results.alreadyExisted++;
+                    } else {
+                        // New user - create document
+                        await chatUserRef.set({
+                            uid: userRecord.uid,
+                            displayName: userRecord.displayName || "Anonymous",
+                            photoURL: userRecord.photoURL || "",
+                            email: userRecord.email || "",
+                            createdAt: userRecord.metadata.creationTime
+                                ? new Date(userRecord.metadata.creationTime).getTime()
+                                : Date.now(),
+                            lastSeen: userRecord.metadata.lastSignInTime
+                                ? new Date(userRecord.metadata.lastSignInTime).getTime()
+                                : Date.now(),
+                            migratedAt: Date.now(),
+                        });
+                        results.newlyCreated++;
+                    }
+                } catch (err) {
+                    results.errors.push({
+                        uid: userRecord.uid,
+                        email: userRecord.email,
+                        error: err.message,
+                    });
+                }
+            }
+
+            // If there are more users, continue pagination
+            if (listUsersResult.pageToken) {
+                await listAllUsers(listUsersResult.pageToken);
+            }
+        };
+
+        await listAllUsers();
+
+        return {
+            success: true,
+            message: `Migration completed. ${results.newlyCreated} new users added, ${results.alreadyExisted} already existed.`,
+            details: results,
+        };
+
+    } catch (error) {
+        console.error("Error during migration:", error);
+        throw new functions.https.HttpsError("internal", "Migration error: " + error.message);
+    }
+});
+
+/**
+ * Automatically add new Firebase Auth users to chatUsers collection
+ * This triggers whenever a new user is created in Firebase Auth
+ */
+exports.onUserCreated = functions.auth.user().onCreate(async (user) => {
+    try {
+        const chatUserRef = db.collection("artifacts").doc(APP_ID)
+            .collection("chatUsers").doc(user.uid);
+
+        await chatUserRef.set({
+            uid: user.uid,
+            displayName: user.displayName || "Anonymous",
+            photoURL: user.photoURL || "",
+            email: user.email || "",
+            createdAt: Date.now(),
+            lastSeen: Date.now(),
+        });
+
+        console.log(`New user ${user.uid} (${user.email}) added to chatUsers`);
+        return null;
+    } catch (error) {
+        console.error("Error adding new user to chatUsers:", error);
+        return null;
     }
 });
